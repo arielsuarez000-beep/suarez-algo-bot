@@ -1217,9 +1217,13 @@ function rangeFindZone1h(closed60,requireSideways=false){
   const closes=w.map(c=>c.c);
   const travel=closes.slice(1).reduce((sum,c,i)=>sum+Math.abs(c-closes[i]),0);
   const efficiency=travel>0?Math.abs(closes.at(-1)-closes[0])/travel:1;
-  let crossings=0;
-  for(let k=1;k<closes.length;k++){
-   if((closes[k-1]-mid)*(closes[k]-mid)<0)crossings++;
+  let crossings=0,previousSide=0;
+  for(const close of closes){
+   const side=close>mid?1:close<mid?-1:0;
+   // Touching the midpoint is neutral; remember the last non-neutral side.
+   if(side===0)continue;
+   if(previousSide!==0&&side!==previousSide)crossings++;
+   previousSide=side;
   }
   // Sideways markets must cross their middle and avoid nearly one-way price movement.
   if(efficiency>.42||crossings<2)return null;
