@@ -1217,15 +1217,18 @@ function rangeFindZone1h(closed60){
 function backtestRangeHourly(rows,options){
  const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed60=rangeAggregate1h(rows);
  let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
- const stats={lowRange:0,noZone:0,weakReward:0,rangeBroken:0,sl:0,tp:0,invalid:0,invalidRisk:0,noReward:0,rrRejected:0,costRejected:0,marginRejected:0,eligible:0,hourlyBreaks:0,hourlyBreaksWhileOpen:0,hourlyBreaksWhileFlat:0,stopBeforeHourlyClose:0,rrSamples:[],costSamples:[],marginSamples:[],examples:[]};
+ const stats={lowRange:0,noZone:0,weakReward:0,rangeBroken:0,sl:0,tp:0,invalid:0,invalidRisk:0,noReward:0,rrRejected:0,costRejected:0,marginRejected:0,eligible:0,hourlyBreaks:0,hourlyBreaksWhileOpen:0,hourlyBreaksWhileFlat:0,stopBeforeHourlyClose:0,stopsLaterHourlyBreak:0,stopsWithoutHourlyBreak:0,rrSamples:[],costSamples:[],marginSamples:[],examples:[]};
  const maxFeeDrag=2*(fee+slippage)/100;
  const draw=e=>{peak=Math.max(peak,e);dd=Math.max(dd,100*(peak-e)/Math.max(peak,.00001))};
  let h=0,currentZone=null,lastZoneEnd=0;
+ let pendingBreakChecks=[];
  function close(p,raw,why,bar,i){
   const sign=p.side==='LONG'?1:-1,exit=raw*(1-sign*rate),fees=(p.entry+exit)*p.qty*fee/100;
   const pnl=sign*(exit-p.entry)*p.qty-fees;balance+=pnl;draw(balance);
   trades.push({side:p.side,entry:p.entry,exit,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high});
-  if(why==='SL')stats.sl++;else if(why==='TP')stats.tp++;else if(why==='RANGE BREAK')stats.rangeBroken++;
+  if(why==='SL'){
+   stats.sl++;pendingBreakChecks.push({low:p.low,high:p.high,stopAt:bar.t,hours:0});
+  }else if(why==='TP')stats.tp++;else if(why==='RANGE BREAK')stats.rangeBroken++;
   open=null;lastClose=i;rearmed=false;
  }
  for(let i=150;i<rows.length;i++){
@@ -1240,6 +1243,19 @@ function backtestRangeHourly(rows,options){
   }
   const lastHour=h?closed60[h-1]:null;
   const newHourClose=!!lastHour&&lastHour.end===bar.t;
+  // Post-stop diagnostic against original fixed range, no trading rule changes.
+  if(newHourClose&&pendingBreakChecks.length){
+   const remaining=[];
+   for(const q of pendingBreakChecks){
+    if(lastHour.end<=q.stopAt){remaining.push(q);continue}
+    q.hours++;
+    const delta=q.high-q.low;
+    if(lastHour.c<q.low-.15*delta||lastHour.c>q.high+.15*delta){stats.stopsLaterHourlyBreak++;continue}
+    if(q.hours>=2){stats.stopsWithoutHourlyBreak++;continue}
+    remaining.push(q);
+   }
+   pendingBreakChecks=remaining;
+  }
   const refZone=open||currentZone;
   const confirmedBreak=!!refZone&&newHourClose&&(lastHour.c<refZone.low-.15*(refZone.high-refZone.low)||lastHour.c>refZone.high+.15*(refZone.high-refZone.low));
   if(confirmedBreak){stats.hourlyBreaks++;if(open)stats.hourlyBreaksWhileOpen++;else stats.hourlyBreaksWhileFlat++}
@@ -1302,6 +1318,7 @@ function backtestRangeHourly(rows,options){
    close(open,sl?(gap?bar.o:stop):take,sl?'SL':'TP',bar,i);
   }
  }
+ stats.pendingStopChecks=pendingBreakChecks.length;
  const wins=trades.filter(t=>t.pnl>0).length,profit=trades.reduce((n,t)=>n+Math.max(0,t.pnl),0),loss=trades.reduce((n,t)=>n+Math.max(0,-t.pnl),0);
  return {balance,pnl:balance-capital,trades,count:trades.length,wins,losses:trades.length-wins,profitFactor:loss?profit/loss:null,maxDD:dd,zones,signals,blocked,open:!!open,stats};
 }
@@ -1361,6 +1378,7 @@ async function runRangeHourly(){
   rangeShowStats('PRIMER 70% · RANGO 1H',first,rows[0].t);
   rangeShowStats('ÚLTIMO 30% · RANGO 1H',second,rows[split].t);
   btResultLine('AUDITORÍA RUPTURAS 1H: primer bloque '+first.stats.hourlyBreaks+' cierres fuera de zona ('+first.stats.hourlyBreaksWhileOpen+' con posición, '+first.stats.hourlyBreaksWhileFlat+' sin posición), SL entre cierres horarios '+first.stats.stopBeforeHourlyClose+'; último bloque '+second.stats.hourlyBreaks+' cierres fuera ('+second.stats.hourlyBreaksWhileOpen+' con posición), SL entre cierres horarios '+second.stats.stopBeforeHourlyClose+'.');
+  btResultLine('RANGO ORIGINAL TRAS SL: primer período '+first.stats.stopsLaterHourlyBreak+' rupturas en siguientes 2 cierres 1h, '+first.stats.stopsWithoutHourlyBreak+' sin ruptura, '+first.stats.pendingStopChecks+' pendientes; último período '+second.stats.stopsLaterHourlyBreak+' rupturas, '+second.stats.stopsWithoutHourlyBreak+' sin ruptura, '+second.stats.pendingStopChecks+' pendientes.');
   btResultLine('La comparación se hace con las mismas comisiones y deslizamiento supuesto. No sumar P&L de períodos como si fuese la misma cartera.');
   btResultLine('No se usan velas horarias ni de 5m sin cerrar para generar señales. Resultados exploratorios; no operan Paper ni Bybit real.');
  }catch(e){el.textContent='RANGO 1H no completado: '+String(e.message||e)}
@@ -1373,10 +1391,10 @@ function hourlyMultiStats(result,startTime){
  const t=result.trades.filter(x=>x.entryTime>=startTime);
  const net=t.reduce((n,x)=>n+x.pnl,0),fees=t.reduce((n,x)=>n+x.fees,0);
  const wins=t.filter(x=>x.pnl>0).length,profit=t.reduce((n,x)=>n+Math.max(0,x.pnl),0),loss=t.reduce((n,x)=>n+Math.max(0,-x.pnl),0);
- return {count:t.length,wins,net,fees,pf:loss>0?profit/loss:null,sl:t.filter(x=>x.reason==='SL').length,tp:t.filter(x=>x.reason==='TP').length,breaks:t.filter(x=>x.reason==='RANGE BREAK').length,hourlyBreaks:result.stats.hourlyBreaks,breakOpen:result.stats.hourlyBreaksWhileOpen,breakFlat:result.stats.hourlyBreaksWhileFlat,earlyStop:result.stats.stopBeforeHourlyClose};
+ return {count:t.length,wins,net,fees,pf:loss>0?profit/loss:null,sl:t.filter(x=>x.reason==='SL').length,tp:t.filter(x=>x.reason==='TP').length,breaks:t.filter(x=>x.reason==='RANGE BREAK').length,hourlyBreaks:result.stats.hourlyBreaks,breakOpen:result.stats.hourlyBreaksWhileOpen,breakFlat:result.stats.hourlyBreaksWhileFlat,earlyStop:result.stats.stopBeforeHourlyClose,stopThenBreak:result.stats.stopsLaterHourlyBreak,stopNoBreak:result.stats.stopsWithoutHourlyBreak,pendingStops:result.stats.pendingStopChecks};
 }
 function hourlyMultiFormat(x){
- return x.count+' operaciones · '+x.wins+' ganadoras · P&L neto '+fmt(x.net)+' USDT · comisiones '+fmt(x.fees)+' · PF '+(x.pf===null?'N/D':fmt(x.pf,2))+' · SL '+x.sl+' / TP '+x.tp+' / salida ruptura '+x.breaks+' · cierres 1h fuera del rango '+x.hourlyBreaks+' (posición '+x.breakOpen+', sin posición '+x.breakFlat+') · SL entre cierres horarios '+x.earlyStop;
+ return x.count+' operaciones · '+x.wins+' ganadoras · P&L neto '+fmt(x.net)+' USDT · comisiones '+fmt(x.fees)+' · PF '+(x.pf===null?'N/D':fmt(x.pf,2))+' · SL '+x.sl+' / TP '+x.tp+' / salida ruptura '+x.breaks+' · cierres 1h fuera del rango '+x.hourlyBreaks+' (posición '+x.breakOpen+', sin posición '+x.breakFlat+') · SL entre cierres horarios '+x.earlyStop+' · SL seguido de ruptura del rango ORIGINAL '+x.stopThenBreak+' · SL sin ruptura '+x.stopNoBreak+' · pendientes '+x.pendingStops;
 }
 async function runRangeHourlyMulti(){
  btUi(true);btController=new AbortController();
@@ -1420,6 +1438,7 @@ async function runRangeHourlyMulti(){
   const bothProfitable=enough.filter(r=>r.train.net>0&&r.test.net>0);
   const lastPositive=completed.filter(r=>r.test.net>0);
   btResultLine('RESUMEN MULTI-CRIPTO: '+completed.length+'/'+pairs.length+' pares procesados · '+failed.length+' errores · '+lastPositive.length+'/'+completed.length+' pares positivos en último 30% · '+enough.length+' con 20+ operaciones por período · '+bothProfitable.length+'/'+enough.length+' positivos en ambos períodos.');
+  btResultLine('RANGO ORIGINAL: después de cada Stop Loss se observan los dos siguientes cierres de 1h respecto de los límites originales. Es un diagnóstico retrospectivo, no modifica órdenes ni predice rupturas.');
   btResultLine('AUDITORÍA DE RUPTURAS: el SL está al 6% del ancho fuera del rango, y la confirmación de ruptura requiere cierre horario al 15% fuera. Es normal que el SL se active antes; cero cierres por ruptura no implica que la protección esté inactiva.');
   btResultLine('Los resultados de diferentes criptos NO se suman como una cartera real. No se modelan posiciones simultáneas ni correlación; pruebas exploratorias, sin dinero real.');
  }catch(e){
