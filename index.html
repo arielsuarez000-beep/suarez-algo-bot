@@ -291,14 +291,18 @@ async function runBacktest(compare=false){
    if(!compare){showBacktest(rows,sym,settings)}
    else {
     const split=Math.floor(rows.length*.7);
-    const test=backtestScalp(rows.slice(split-120),settings);
-    results.push({pair:sym,r:test});
+    const segment=rows.slice(Math.max(0,split-240));
+    const base=backtestScalp(segment,settings),experimental=backtestExperimental(segment,settings);
+    results.push({pair:sym,r:base,exp:experimental});
    }
   }
   if(compare){
    $('btResults').textContent='';
-   btResultLine('COMPARACIÓN EXPLORATORIA · 10 pares · 7 días · únicamente el 30% final de cada par. NO es validación de rentabilidad.');
-   for(const item of results.sort((a,b)=>b.r.pnl-a.r.pnl))btResultLine(item.pair+' · '+btSummary(item.r));
+   btResultLine('COMPARACIÓN EXPLORATORIA V10 vs V11 · 10 pares · 7 días · únicamente el 30% final de cada par. NO es validación de rentabilidad.');
+   for(const item of results.sort((a,b)=>b.exp.pnl-a.exp.pnl)){
+    btResultLine(item.pair+' · V10 '+btSummary(item.r));
+    btResultLine(item.pair+' · V11 '+btSummary(item.exp));
+   }
    btResultLine('No se agregan ganancias entre pares: cada uno se evaluó de forma independiente con el mismo capital. No incluye correlación, simultaneidad ni límites de una cartera real.');
   }
  }catch(e){$('btResults').textContent='Prueba no completada: '+e.message+' · Los resultados incompletos no se muestran como válidos.'}
