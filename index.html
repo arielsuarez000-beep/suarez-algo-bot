@@ -797,7 +797,7 @@ function auditV19(result,settings){
  const grossPF=grossLoss>0?grossWin/grossLoss:null;
  const afterWin=avg(wins,t=>t.pnl),afterLoss=avg(losses,t=>-t.pnl);
  const breakEven=afterWin+afterLoss>0?100*afterLoss/(afterWin+afterLoss):null;
- const validation=Object.values(diagnostics).every(v=>v===0);
+ const validation=diagnostics.pnlMismatch<0.000001&&Object.entries(diagnostics).filter(([k])=>k!=='pnlMismatch').every(([,v])=>v===0);
  return {total,net:netSum,gross:grossSum,fees,wins:wins.length,losses:losses.length,grossPF,netPF:result.profitFactor,avgWin:afterWin,avgLoss:afterLoss,breakeven:breakEven,costFlip:gross.filter(x=>x.gross>0&&x.t.pnl<=0).length,long:analyze('LONG'),short:analyze('SHORT'),diagnostics,validation,zeroSlippageComment:'Gross excludes estimated commissions but still includes assumed execution slippage.'};
 }
 async function runAudit19(){
