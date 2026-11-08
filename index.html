@@ -13,7 +13,7 @@
 <div class="formgrid"><div class="field"><label>Par de prueba</label><select id="btPair"><option value="BTCUSDT">BTCUSDT</option><option value="ETHUSDT">ETHUSDT</option><option value="SOLUSDT">SOLUSDT</option><option value="PEPEUSDT">PEPEUSDT</option><option value="TAOUSDT">TAOUSDT</option><option value="NEARUSDT">NEARUSDT</option><option value="AVAXUSDT">AVAXUSDT</option><option value="DOGEUSDT">DOGEUSDT</option><option value="LINKUSDT">LINKUSDT</option><option value="ARBUSDT">ARBUSDT</option></select></div>
 <div class="field"><label>Período histórico</label><select id="btCount"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></div>
 <div class="field"><label>Deslizamiento estimado por ejecución (%)</label><input id="btSlip" type="number" min="0" max="1" step="0.01" value="0.03"></div></div>
-<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btHourly">▶ Probar rango 1h · entradas 5m</button><button class="btn primary" id="btHourlyMulti">▶ Rango 1h/5m · comparar 10 criptos (30 días)</button><button class="btn blue" id="btStopsCompare">▶ Comparar Stop 6% vs 12% · 10 criptos</button><button class="btn primary" id="btConfirmCompare">▶ Comparar entrada directa vs vela confirmada · 10 criptos</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
+<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btHourly">▶ Probar rango 1h · entradas 5m</button><button class="btn primary" id="btHourlyMulti">▶ Rango 1h/5m · comparar 10 criptos (30 días)</button><button class="btn blue" id="btStopsCompare">▶ Comparar Stop 6% vs 12% · 10 criptos</button><button class="btn primary" id="btConfirmCompare">▶ Comparar entrada directa vs vela confirmada · 10 criptos</button><button class="btn blue" id="btVisualAudit">▥ Auditoría visual · 5 pérdidas en gráfico</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
 <div id="btResults" class="notice" aria-live="polite">Sin prueba realizada.</div>
 <p class="dim">Modelo: señal al cierre de vela, entrada a la apertura de la vela siguiente, SL/TP intravela (si ambos se alcanzan: SL), comisiones por lado y deslizamiento estimado. No contempla financiación, liquidaciones, profundidad ni deslizamiento real; no es una garantía de rentabilidad. El drawdown incluye una estimación conservadora de pérdidas flotantes. El backtest separa el primer 70% y último 30% sin optimizar parámetros. V11 es solo experimental y NO se utiliza para abrir posiciones.</p></section>
 <section class="panel"><h2>◷ HISTORIAL DE OPERACIONES CERRADAS</h2><div class="grid"><div class="stat"><label>Par más rentable</label><div class="value green-t" id="bestPair">—</div><small id="bestPairSub">Sin operaciones</small></div><div class="stat"><label>Par con más aciertos</label><div class="value blue-t" id="mostWins">—</div><small id="mostWinsSub">Sin operaciones</small></div></div><div class="tablewrap" style="margin-top:18px"><table><thead><tr><th>Fecha / Hora</th><th>Par</th><th>Tipo</th><th>P. entrada</th><th>P. salida</th><th>P&L USDT</th></tr></thead><tbody id="history"></tbody></table></div></section><footer>SUAREZ Algo Bot · Prototipo independiente RANGE PRO · Sin conexión de órdenes reales<br>Los datos históricos de las capturas de Base44 no se importaron.</footer></main>
@@ -692,7 +692,7 @@ function showBacktest(rows,pair,settings){
  }
  btResultLine('V11, V12, V13, V15 y V17 son solo backtests experimentales, no abren operaciones Paper. Mismo capital y costes. No usar para dinero real.');
 }
-function btUi(busy){btBusy=busy;$('btRun').disabled=busy;$('btCompare').disabled=busy;$('btRobust').disabled=busy;$('btAudit19').disabled=busy;$('btMarkets20').disabled=busy;$('btQuality21').disabled=busy;$('btRange').disabled=busy;$('btHourly').disabled=busy;$('btHourlyMulti').disabled=busy;$('btStopsCompare').disabled=busy;$('btConfirmCompare').disabled=busy;$('btCancel').disabled=!busy}
+function btUi(busy){btBusy=busy;$('btRun').disabled=busy;$('btCompare').disabled=busy;$('btRobust').disabled=busy;$('btAudit19').disabled=busy;$('btMarkets20').disabled=busy;$('btQuality21').disabled=busy;$('btRange').disabled=busy;$('btHourly').disabled=busy;$('btHourlyMulti').disabled=busy;$('btStopsCompare').disabled=busy;$('btConfirmCompare').disabled=busy;$('btVisualAudit').disabled=busy;$('btCancel').disabled=!busy}
 async function runBacktest(compare=false){
  btUi(true);btController=new AbortController();$('btResults').textContent='Descargando datos...';
  try{
@@ -1225,7 +1225,7 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
  function close(p,raw,why,bar,i){
   const sign=p.side==='LONG'?1:-1,exit=raw*(1-sign*rate),fees=(p.entry+exit)*p.qty*fee/100;
   const pnl=sign*(exit-p.entry)*p.qty-fees;balance+=pnl;draw(balance);
-  trades.push({side:p.side,entry:p.entry,exit,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high});
+  trades.push({side:p.side,entry:p.entry,exit,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high,stop:p.stop,take:p.take});
   if(why==='SL'){
    stats.sl++;pendingBreakChecks.push({low:p.low,high:p.high,stopAt:bar.t,hours:0});
   }else if(why==='TP')stats.tp++;else if(why==='RANGE BREAK')stats.rangeBroken++;
@@ -1556,6 +1556,83 @@ async function runHourlyConfirmationComparison(){
  finally{btUi(false);btController=null}
 }
 $('btConfirmCompare').onclick=runHourlyConfirmationComparison;
+
+function btDrawAuditChart(canvas,rows,trade){
+ const ctx=canvas.getContext('2d');
+ if(!ctx)return;
+ const width=canvas.width=900,height=canvas.height=350;
+ const entryIndex=rows.findIndex(c=>c.t===trade.entryTime),exitIndex=rows.findIndex(c=>c.t===trade.date);
+ if(entryIndex<0||exitIndex<0)return;
+ const start=Math.max(0,entryIndex-18),end=Math.min(rows.length-1,Math.max(exitIndex+10,entryIndex+16));
+ const candles=rows.slice(start,end+1),all=[...candles.map(x=>x.h),...candles.map(x=>x.l),trade.rangeLow,trade.rangeHigh,trade.entry,trade.stop,trade.take];
+ let lo=Math.min(...all),hi=Math.max(...all);const pad=Math.max((hi-lo)*.08,hi*.00005);lo-=pad;hi+=pad;
+ const L=56,R=25,T=22,B=45,pw=width-L-R,ph=height-T-B;
+ const toX=index=>L+(index-start+.5)*pw/candles.length,toY=price=>T+(hi-price)/(hi-lo)*ph;
+ ctx.fillStyle='#070e1c';ctx.fillRect(0,0,width,height);
+ ctx.font='13px system-ui';ctx.textBaseline='middle';
+ for(let k=0;k<=4;k++){
+  const price=lo+(hi-lo)*k/4,y=toY(price);
+  ctx.strokeStyle='#1b3044';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(width-R,y);ctx.stroke();
+  ctx.fillStyle='#94a8c1';ctx.fillText(price.toPrecision(6),3,y);
+ }
+ function horiz(value,color,name,dashed=false){
+  const y=toY(value);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dashed?[7,5]:[]);
+  ctx.beginPath();ctx.moveTo(L,y);ctx.lineTo(width-R,y);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle=color;ctx.fillText(name,Math.max(L+5,width-R-105),Math.max(T+9,Math.min(height-B-9,y-9)));
+ }
+ const gap=pw/candles.length;
+ candles.forEach((c,j)=>{
+  const x=toX(start+j),up=c.c>=c.o,color=up?'#23ceaa':'#f06b80';
+  ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x,toY(c.h));ctx.lineTo(x,toY(c.l));ctx.stroke();
+  const y1=toY(Math.max(c.o,c.c)),y2=toY(Math.min(c.o,c.c));
+  ctx.fillRect(x-Math.max(2,gap*.31),y1,Math.max(4,gap*.62),Math.max(2,y2-y1));
+ });
+ horiz(trade.rangeLow,'#37bbff','Soporte',true);horiz(trade.rangeHigh,'#37bbff','Resistencia',true);
+ horiz(trade.stop,'#ff6279','Stop');horiz(trade.take,'#21d1a4','Objetivo');
+ horiz(trade.entry,'#ffcb56','Entrada',true);
+ function marker(index,color,label){
+  const x=toX(index),y=T+10;ctx.strokeStyle=color;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,T);ctx.lineTo(x,height-B);ctx.stroke();
+  ctx.fillStyle=color;ctx.fillText(label,Math.max(L,Math.min(width-R-70,x+5)),y);
+ }
+ marker(entryIndex,'#ffcb56','ENTRADA');
+ marker(exitIndex,'#fa93a4','SALIDA');
+ ctx.fillStyle='#a8bad1';ctx.fillText('Velas 5m cerradas · '+new Date(candles[0].t).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' — '+new Date(candles.at(-1).t).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}),L,height-17);
+}
+function btRenderVisualAudit(rows,pair,trades){
+ const root=$('btResults');root.textContent='';
+ btResultLine('AUDITORÍA VISUAL · '+pair+' · rango 1h / entrada 5m · stop original 6% · sin modificar estrategias ni Paper Trading.');
+ btResultLine('Se muestran hasta 5 operaciones perdedoras. Líneas azules: rango ORIGINAL de cada operación. Amarillo: entrada; rojo: stop; verde: objetivo. Las velas son históricas 5m, no datos tick a tick.');
+ if(!trades.length){btResultLine('No hay operaciones perdedoras cerradas para visualizar en este período. Probá otro par o período.');return}
+ for(let n=0;n<trades.length;n++){
+  const tr=trades[n];
+  const wrap=document.createElement('div');
+  wrap.style.cssText='margin:16px 0;padding:12px;border:1px solid #334760;background:#071325;border-radius:14px';
+  const head=document.createElement('div');head.style.cssText='font-weight:700;color:#e8eef9;margin-bottom:8px';
+  head.textContent='#'+(n+1)+' · '+tr.side+' · '+new Date(tr.entryTime).toLocaleString('es-AR')+' → '+new Date(tr.date).toLocaleString('es-AR')+' · '+tr.reason+' · P&L '+fmt(tr.pnl)+' USDT';
+  const info=document.createElement('p');info.style.cssText='font-size:12px;color:#9eafc8';
+  info.textContent='Soporte '+tr.rangeLow.toPrecision(7)+' · Resistencia '+tr.rangeHigh.toPrecision(7)+' · Entrada '+tr.entry.toPrecision(7)+' · Stop '+tr.stop.toPrecision(7)+' · Objetivo '+tr.take.toPrecision(7)+' · costos '+fmt(tr.fees)+' USDT';
+  const cv=document.createElement('canvas');cv.style.cssText='display:block;width:100%;height:auto;background:#070e1c;border-radius:10px';cv.setAttribute('role','img');cv.setAttribute('aria-label','Velas históricas 5m con entrada, salida, soporte, resistencia, stop y objetivo');
+  wrap.append(head,cv,info);root.appendChild(wrap);btDrawAuditChart(cv,rows,tr);
+ }
+ btResultLine('Esta visualización ayuda a estudiar entradas fallidas, pero no demuestra que otro filtro sea rentable. Las velas no muestran la secuencia intravela de precios ni la liquidez real.');
+}
+async function runVisualRangeAudit(){
+ btUi(true);btController=new AbortController();const ctl=btController,el=$('btResults');
+ el.textContent='Preparando auditoría visual de pérdidas…';
+ try{
+  if(Number($('tf').value)!==5)throw Error('Seleccioná temporalidad de 5 minutos.');
+  const pair=$('btPair').value,days=Number($('btCount').value),settings=btSettings();
+  if(!PAIRS.includes(pair)||![7,30,90].includes(days))throw Error('Par o período inválido.');
+  const rows=await btFetchDays(pair,days,ctl,(p,page,max,count,expected)=>{el.textContent='Descargando '+p+' · página '+page+' · '+count+'/'+expected+' velas.'});
+  const result=backtestRangeHourly(rows,settings,.06,false);
+  const losers=result.trades.filter(t=>t.pnl<0).slice(-5).reverse();
+  btRenderVisualAudit(rows,pair,losers);
+ }catch(e){el.textContent='Auditoría visual no completada: '+String(e.message||e)}
+ finally{btUi(false);btController=null}
+}
+$('btVisualAudit').onclick=runVisualRangeAudit;
+
 
 
 
