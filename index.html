@@ -1360,7 +1360,7 @@ async function runRangeHourly(){
   btResultLine('Rangos 1h: 12 velas cerradas, mínimo 2 contactos por extremo, amplitud 0,6%–8%, filtro de deriva lateral. Entrada por rechazo en 5m, TP 18% antes del extremo opuesto, SL 6% fuera, mínimo 1,2R, mismo filtro de costos, 1 posición.');
   rangeShowStats('PRIMER 70% · RANGO 1H',first,rows[0].t);
   rangeShowStats('ÚLTIMO 30% · RANGO 1H',second,rows[split].t);
-  btResultLine('AUDITORÍA RUPTURAS 1H: primer bloque '+first.stats.hourlyBreaks+' cierres fuera de zona ('+first.stats.hourlyBreaksWhileOpen+' con posición, '+first.stats.hourlyBreaksWhileFlat+' sin posición), SL antes de cierre horario '+first.stats.stopBeforeHourlyClose+'; último bloque '+second.stats.hourlyBreaks+' cierres fuera ('+second.stats.hourlyBreaksWhileOpen+' con posición), SL antes de cierre horario '+second.stats.stopBeforeHourlyClose+'.');
+  btResultLine('AUDITORÍA RUPTURAS 1H: primer bloque '+first.stats.hourlyBreaks+' cierres fuera de zona ('+first.stats.hourlyBreaksWhileOpen+' con posición, '+first.stats.hourlyBreaksWhileFlat+' sin posición), SL entre cierres horarios '+first.stats.stopBeforeHourlyClose+'; último bloque '+second.stats.hourlyBreaks+' cierres fuera ('+second.stats.hourlyBreaksWhileOpen+' con posición), SL entre cierres horarios '+second.stats.stopBeforeHourlyClose+'.');
   btResultLine('La comparación se hace con las mismas comisiones y deslizamiento supuesto. No sumar P&L de períodos como si fuese la misma cartera.');
   btResultLine('No se usan velas horarias ni de 5m sin cerrar para generar señales. Resultados exploratorios; no operan Paper ni Bybit real.');
  }catch(e){el.textContent='RANGO 1H no completado: '+String(e.message||e)}
@@ -1376,7 +1376,7 @@ function hourlyMultiStats(result,startTime){
  return {count:t.length,wins,net,fees,pf:loss>0?profit/loss:null,sl:t.filter(x=>x.reason==='SL').length,tp:t.filter(x=>x.reason==='TP').length,breaks:t.filter(x=>x.reason==='RANGE BREAK').length,hourlyBreaks:result.stats.hourlyBreaks,breakOpen:result.stats.hourlyBreaksWhileOpen,breakFlat:result.stats.hourlyBreaksWhileFlat,earlyStop:result.stats.stopBeforeHourlyClose};
 }
 function hourlyMultiFormat(x){
- return x.count+' operaciones · '+x.wins+' ganadoras · P&L neto '+fmt(x.net)+' USDT · comisiones '+fmt(x.fees)+' · PF '+(x.pf===null?'N/D':fmt(x.pf,2))+' · SL '+x.sl+' / TP '+x.tp+' / salida ruptura '+x.breaks+' · cierres 1h fuera del rango '+x.hourlyBreaks+' (posición '+x.breakOpen+', sin posición '+x.breakFlat+') · SL antes de cierre 1h '+x.earlyStop;
+ return x.count+' operaciones · '+x.wins+' ganadoras · P&L neto '+fmt(x.net)+' USDT · comisiones '+fmt(x.fees)+' · PF '+(x.pf===null?'N/D':fmt(x.pf,2))+' · SL '+x.sl+' / TP '+x.tp+' / salida ruptura '+x.breaks+' · cierres 1h fuera del rango '+x.hourlyBreaks+' (posición '+x.breakOpen+', sin posición '+x.breakFlat+') · SL entre cierres horarios '+x.earlyStop;
 }
 async function runRangeHourlyMulti(){
  btUi(true);btController=new AbortController();
