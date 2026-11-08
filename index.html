@@ -8,12 +8,12 @@
 <section class="panel"><div class="flex"><h2 id="chartTitle">GRÁFICO BTCUSDT</h2><span class="dim" id="chartPeriod">5m · Bybit</span></div><canvas id="chart" class="hchart"></canvas><div class="flex" style="margin-top:10px;flex-wrap:wrap"><span class="dim" id="chartLive">● Esperando primera cotización</span><span class="dim" id="chartClock">—</span></div><div class="notice">Gráfico propio de velas públicas, no es TradingView. La última vela incompleta se excluye del análisis de señales. Los stops simulados se evalúan cuando se actualiza el mercado; si SL y TP aparecen en la misma vela se prioriza SL (criterio conservador).</div></section>
 <section class="panel"><h2>⌁ REGISTRO EN TIEMPO REAL</h2><div class="log" id="logs"></div></section>
 <section class="panel"><h2>⚙ PANEL DE CONFIGURACIÓN</h2><div class="flex"><div><h3>Estado del escáner</h3><small>Actualización automática del gráfico cada 10 s mientras la página esté visible</small></div><label class="switch"><input id="auto" type="checkbox" checked><span class="dim">ON</span></label></div><hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><div class="formgrid"><div class="field"><label>Capital inicial Paper (USDT)</label><input id="initial" type="number" min="10" step="10" value="100"></div><div class="field"><label>Temporalidad análisis</label><select id="tf"><option value="1">1m</option><option value="5" selected>5m</option><option value="15">15m</option><option value="30">30m</option><option value="60">1h</option></select></div><div class="field"><label>Estrategia activa (análisis / Auto Paper)</label><select id="strategy"><option value="structure">Estructura HH/HL · LH/LL</option><option value="ema">Cruce EMA 9/50 (vela cerrada)</option><option value="scalp">Scalp Confluencia PRO · EMA/RSI/ADX/Vol/ATR</option></select></div><div class="field"><label>Actualizar cada</label><select id="interval"><option value="10" selected>10 segundos</option><option value="15">15 segundos</option><option value="30">30 segundos</option><option value="60">60 segundos</option></select></div></div><div class="notice"><strong>Scalp Confluencia PRO</strong><p class="dim">Estrategia para 5m: EMA 9/21/50, retroceso y recuperación, RSI14, ADX14, volumen relativo y ATR14. Puntaje mínimo 75/100, confirmado al cierre de vela. Sin garantía de rentabilidad.</p></div><div class="notice"><strong>🤖 MOTOR AUTOMÁTICO · SOLO PAPER</strong><div style="margin-top:10px" class="flex"><div>Permitir entradas automáticas simuladas<br><small>Inicia apagado cada vez que abrís la app. Usa únicamente velas cerradas nuevas.</small></div><label class="switch"><input id="autoPaper" type="checkbox"><span class="dim" id="autoPaperLabel">OFF</span></label></div><div class="formgrid" style="margin-top:12px"><div class="field"><label>Máximo operaciones por día</label><input id="maxTrades" type="number" min="1" max="20" value="5"></div><div class="field"><label>Pérdida diaria máxima (% capital inicial)</label><input id="dailyLoss" type="number" min="0.5" max="10" step="0.5" value="3"></div><div class="field"><label>Enfriamiento después de cerrar (velas)</label><input id="cooldown" type="number" min="1" max="20" value="3"></div><div class="field"><label>Escanear todos cada</label><select id="scanEvery"><option value="60" selected>60 segundos</option><option value="120">120 segundos</option><option value="300">300 segundos</option></select></div></div><div class="notice"><strong>Diagnóstico de señales (cada par)</strong><p class="dim" id="historicalAudit">Revisando señales anteriores…</p><p class="dim">La primera vela observada establece el punto de partida; una señal solo se ejecuta al cerrarse una vela posterior. Sin señales no significa error.</p><div id="signalDiagnostics" class="log" style="max-height:270px;overflow:auto">Esperando velas…</div></div><p id="autoPaperStatus" class="dim">Entradas automáticas desactivadas. El motor no opera con la página cerrada.</p><p class="notice warn">No se garantiza rentabilidad. Las entradas Paper se calculan con el último precio observado (no una ejecución real); SL/TP solo se revisan cuando el navegador está activo. Las velas faltantes y cierres con gaps pueden alterar los resultados. No ingreses claves API aquí.</p></div><div class="notice">🔒 Bybit LIVE / Testnet: no implementados en esta versión. No ingreses API Key ni Secret en esta app HTML. En una versión futura las claves deberán gestionarse en un backend seguro, nunca en el navegador.</div><div class="line"><button class="btn" id="setCapital">Aplicar capital inicial</button><button class="btn blue" id="export">Exportar historial CSV</button><button class="btn danger" id="reset">Reiniciar Paper</button></div></section>
-<section class="panel" id="backtestPanel"><h2>▤ BACKTEST HISTÓRICO · SCALP PRO</h2><div class="notice"><strong>RANGE SCALPER PRO · Diagnóstico de bloqueos 15m/5m · Solo backtest</strong><p class="dim">V21 mide distancia a zona, retardo entre ruptura/retest/confirmación, fricción vs objetivo y resultados por tipo de entrada. No modifica condiciones de trading. V20 compara V17A sin alterar parámetros en BTC, ETH, SOL y los demás pares, separando cronológicamente el 70% inicial del 30% final. Reporta los errores sin inventar resultados. V19 añade conciliación de pérdidas brutas, comisiones, slippage supuesto, ganancia/pérdida media, LONG/SHORT y comprobaciones del simulador de V17A. V18 añade una prueba de consistencia de V15 vs V17A (ATR ≥0,15%) en tres bloques cronológicos no superpuestos, sin ajustar parámetros. Estos períodos históricos pueden haberse examinado previamente: no constituyen validación genuinamente futura. V17 compara V15 sin cambios contra: filtro ATR ≥0,15% al entrar, cierre por tiempo tras 7 velas completas, y ambos juntos. Los resultados se calculan por separado; no se activan operaciones nuevas. Conserva V10–V14 sin modificar sus reglas ni resultados. V13 exige ruptura de 20 velas con volumen, retest dentro de 8 velas posteriores y confirmación al cierre; filtro de tendencia superior, stop técnico con ATR y objetivo 2R. No abre órdenes Paper. V11 usa filtro EMA50 de temporalidad 3× superior (15m si probás 5m), Stop Loss inicial 1,5 ATR, TP inicial 2,5 ATR, break-even al alcanzar 1 ATR y trailing de 1,5 ATR desde 2 ATR. Los ajustes se aplican desde la vela posterior a la confirmación, nunca usando información futura.</p></div>
+<section class="panel" id="backtestPanel"><h2>▤ BACKTEST HISTÓRICO · SCALP PRO</h2><div class="notice"><strong>RANGE SCALPER PRO · Comparación de salidas 15m/5m · Solo backtest</strong><p class="dim">V21 mide distancia a zona, retardo entre ruptura/retest/confirmación, fricción vs objetivo y resultados por tipo de entrada. No modifica condiciones de trading. V20 compara V17A sin alterar parámetros en BTC, ETH, SOL y los demás pares, separando cronológicamente el 70% inicial del 30% final. Reporta los errores sin inventar resultados. V19 añade conciliación de pérdidas brutas, comisiones, slippage supuesto, ganancia/pérdida media, LONG/SHORT y comprobaciones del simulador de V17A. V18 añade una prueba de consistencia de V15 vs V17A (ATR ≥0,15%) en tres bloques cronológicos no superpuestos, sin ajustar parámetros. Estos períodos históricos pueden haberse examinado previamente: no constituyen validación genuinamente futura. V17 compara V15 sin cambios contra: filtro ATR ≥0,15% al entrar, cierre por tiempo tras 7 velas completas, y ambos juntos. Los resultados se calculan por separado; no se activan operaciones nuevas. Conserva V10–V14 sin modificar sus reglas ni resultados. V13 exige ruptura de 20 velas con volumen, retest dentro de 8 velas posteriores y confirmación al cierre; filtro de tendencia superior, stop técnico con ATR y objetivo 2R. No abre órdenes Paper. V11 usa filtro EMA50 de temporalidad 3× superior (15m si probás 5m), Stop Loss inicial 1,5 ATR, TP inicial 2,5 ATR, break-even al alcanzar 1 ATR y trailing de 1,5 ATR desde 2 ATR. Los ajustes se aplican desde la vela posterior a la confirmación, nunca usando información futura.</p></div>
 <p class="dim">Prueba independiente: no abre, modifica ni cierra operaciones Paper. Usa velas cerradas de Bybit y la estrategia Scalp Confluencia PRO.</p>
 <div class="formgrid"><div class="field"><label>Par de prueba</label><select id="btPair"><option value="BTCUSDT">BTCUSDT</option><option value="ETHUSDT">ETHUSDT</option><option value="SOLUSDT">SOLUSDT</option><option value="PEPEUSDT">PEPEUSDT</option><option value="TAOUSDT">TAOUSDT</option><option value="NEARUSDT">NEARUSDT</option><option value="AVAXUSDT">AVAXUSDT</option><option value="DOGEUSDT">DOGEUSDT</option><option value="LINKUSDT">LINKUSDT</option><option value="ARBUSDT">ARBUSDT</option></select></div>
 <div class="field"><label>Período histórico</label><select id="btCount"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></div>
 <div class="field"><label>Deslizamiento estimado por ejecución (%)</label><input id="btSlip" type="number" min="0" max="1" step="0.01" value="0.03"></div></div>
-<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Probar RANGE SCALPER PRO · 15m/5m</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
+<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
 <div id="btResults" class="notice" aria-live="polite">Sin prueba realizada.</div>
 <p class="dim">Modelo: señal al cierre de vela, entrada a la apertura de la vela siguiente, SL/TP intravela (si ambos se alcanzan: SL), comisiones por lado y deslizamiento estimado. No contempla financiación, liquidaciones, profundidad ni deslizamiento real; no es una garantía de rentabilidad. El drawdown incluye una estimación conservadora de pérdidas flotantes. El backtest separa el primer 70% y último 30% sin optimizar parámetros. V11 es solo experimental y NO se utiliza para abrir posiciones.</p></section>
 <section class="panel"><h2>◷ HISTORIAL DE OPERACIONES CERRADAS</h2><div class="grid"><div class="stat"><label>Par más rentable</label><div class="value green-t" id="bestPair">—</div><small id="bestPairSub">Sin operaciones</small></div><div class="stat"><label>Par con más aciertos</label><div class="value blue-t" id="mostWins">—</div><small id="mostWinsSub">Sin operaciones</small></div></div><div class="tablewrap" style="margin-top:18px"><table><thead><tr><th>Fecha / Hora</th><th>Par</th><th>Tipo</th><th>P. entrada</th><th>P. salida</th><th>P&L USDT</th></tr></thead><tbody id="history"></tbody></table></div></section><footer>SUAREZ Algo Bot · Prototipo independiente RANGE PRO · Sin conexión de órdenes reales<br>Los datos históricos de las capturas de Base44 no se importaron.</footer></main>
@@ -1087,6 +1087,93 @@ function backtestRangePro(rows,options){
  const wins=trades.filter(t=>t.pnl>0).length,profit=trades.reduce((n,t)=>n+Math.max(0,t.pnl),0),loss=trades.reduce((n,t)=>n+Math.max(0,-t.pnl),0);
  return {balance,pnl:balance-capital,trades,count:trades.length,wins,losses:trades.length-wins,profitFactor:loss?profit/loss:null,maxDD:dd,zones,signals,blocked,open:!!open,stats};
 }
+function backtestRangeOpposite(rows,options){
+ const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed15=rangeAggregate15(rows);
+ let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
+ const stats={lowRange:0,noZone:0,weakReward:0,rangeBroken:0,sl:0,tp:0,invalid:0,invalidRisk:0,noReward:0,rrRejected:0,costRejected:0,marginRejected:0,eligible:0,rrSamples:[],costSamples:[],marginSamples:[],examples:[]};
+ const maxFeeDrag=2*(fee+slippage)/100;
+ const draw=e=>{peak=Math.max(peak,e);dd=Math.max(dd,100*(peak-e)/Math.max(peak,.00001))};
+ let h=0,currentZone=null,lastZoneEnd=0;
+ function close(p,raw,why,bar,i){
+  const sign=p.side==='LONG'?1:-1,exit=raw*(1-sign*rate),fees=(p.entry+exit)*p.qty*fee/100;
+  const pnl=sign*(exit-p.entry)*p.qty-fees;balance+=pnl;draw(balance);
+  trades.push({side:p.side,entry:p.entry,exit,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high});
+  if(why==='SL')stats.sl++;else if(why==='TP')stats.tp++;else if(why==='RANGE BREAK')stats.rangeBroken++;
+  open=null;lastClose=i;rearmed=false;
+ }
+ for(let i=90;i<rows.length;i++){
+  const bar=rows[i],last=rows[i-1];
+  // Only a completely closed 15m candle can update range detection.
+  while(h<closed15.length&&closed15[h].end<=bar.t){h++}
+  if(h&&closed15[h-1].end!==lastZoneEnd){
+   const local=closed15.slice(Math.max(0,h-24),h);
+   currentZone=rangeFindZone(local);
+   if(currentZone){zones++;lastZoneEnd=closed15[h-1].end}
+   else lastZoneEnd=closed15[h-1].end;
+  }
+  if(open){
+   const long=open.side==='LONG',sign=long?1:-1,worst=long?bar.l:bar.h;
+   draw(balance+sign*(worst-open.entry)*open.qty-(open.entry+worst)*open.qty*fee/100);
+   // A break is defined by a fully closed 15m bar, acted on at next 5m opening.
+   const last15=h?closed15[h-1]:null;
+   if(last15&&last15.end===bar.t&&(last15.c<open.low-.15*(open.high-open.low)||last15.c>open.high+.15*(open.high-open.low))){
+    close(open,bar.o,'RANGE BREAK',bar,i);
+   }else{
+    const sl=long?bar.l<=open.stop:bar.h>=open.stop,tp=long?bar.h>=open.take:bar.l<=open.take;
+    if(sl||tp){
+     const gap=sl&&(long?bar.o<open.stop:bar.o>open.stop);
+     close(open,sl?(gap?bar.o:open.stop):open.take,sl?'SL':'TP',bar,i);
+    }
+   }
+  }
+  if(!currentZone){stats.noZone++;continue}
+  const {low,high,width,mid}=currentZone;
+  // Re-arm only after price has visibly returned to the middle of the range.
+  if(last.c>=low+.38*width&&last.c<=low+.62*width)rearmed=true;
+  if(open||!rearmed||i-lastClose<=3||balance<=0)continue;
+  const bullish=last.l<=low+.18*width&&last.c>=low+.08*width&&last.c<=low+.34*width&&last.c>last.o;
+  const bearish=last.h>=high-.18*width&&last.c<=high-.08*width&&last.c>=high-.34*width&&last.c<last.o;
+  if(!bullish&&!bearish)continue;
+  signals++;
+  const long=bullish,sign=long?1:-1,entry=bar.o*(1+sign*rate);
+  // Alternative: stop remains outside invalidated range, but with a smaller 6% buffer.
+  const stop=long?low-.06*width:high+.06*width;
+  // Alternative take profit near the opposite side, before full resistance/support.
+  const take=long?high-.18*width:low+.18*width;
+  const risk=sign*(entry-stop),reward=sign*(take-entry);
+  // Reward must be positive, cover fees/slippage, and reach >=1.2 gross R.
+  const rr=risk>0?reward/risk:null,costMultiple=entry>0?reward/entry/maxFeeDrag:null;
+  if(Number.isFinite(rr))stats.rrSamples.push(rr);
+  if(Number.isFinite(costMultiple))stats.costSamples.push(costMultiple);
+  // Exclusive rejection reasons: same decision and precedence as the existing compound rule.
+  let reason=null;
+  if(!(risk>0)){stats.invalidRisk++;reason='riesgo o stop inválido'}
+  else if(!(reward>0)){stats.noReward++;reason='objetivo del lado incorrecto'}
+  else if(!(rr>=1.2)){stats.rrRejected++;reason='riesgo/beneficio menor a 1,2R'}
+  else if(!(reward/entry>=3*maxFeeDrag)){stats.costRejected++;reason='objetivo insuficiente para costos'}
+  if(reason){
+   stats.weakReward++;blocked++;
+   if(stats.examples.length<5)stats.examples.push({reason,side:long?'LONG':'SHORT',rr,costMultiple,entry,stop,take});
+   continue;
+  }
+  const lossPerMargin=leverage*(risk/entry+maxFeeDrag);
+  const used=Math.min(margin,balance,balance*riskPct/100/lossPerMargin);
+  stats.marginSamples.push(used);
+  if(used<1){stats.marginRejected++;blocked++;if(stats.examples.length<5)stats.examples.push({reason:'margen menor a 1 USDT',side:long?'LONG':'SHORT',rr,costMultiple,used});continue}
+  stats.eligible++;
+  const qty=used*leverage/entry;
+  open={side:long?'LONG':'SHORT',entry,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high};
+  rearmed=false;
+  const sl=long?bar.l<=stop:bar.h>=stop,tp=long?bar.h>=take:bar.l<=take;
+  if(sl||tp){
+   const gap=sl&&(long?bar.o<stop:bar.o>stop);
+   close(open,sl?(gap?bar.o:stop):take,sl?'SL':'TP',bar,i);
+  }
+ }
+ const wins=trades.filter(t=>t.pnl>0).length,profit=trades.reduce((n,t)=>n+Math.max(0,t.pnl),0),loss=trades.reduce((n,t)=>n+Math.max(0,-t.pnl),0);
+ return {balance,pnl:balance-capital,trades,count:trades.length,wins,losses:trades.length-wins,profitFactor:loss?profit/loss:null,maxDD:dd,zones,signals,blocked,open:!!open,stats};
+}
+
 function rangeShowStats(title,result,startTime){
  const t=result.trades.filter(x=>x.entryTime>=startTime),net=t.reduce((z,x)=>z+x.pnl,0),wins=t.filter(x=>x.pnl>0).length,profit=t.reduce((z,x)=>z+Math.max(0,x.pnl),0),loss=t.reduce((z,x)=>z+Math.max(0,-x.pnl),0),fees=t.reduce((z,x)=>z+x.fees,0);
  const why=label=>t.filter(x=>x.reason===label).length;
@@ -1110,11 +1197,14 @@ async function runRangePro(){
   el.textContent='';
   const split=Math.floor(rows.length*.7),w=90;
   btResultLine('RANGE SCALPER PRO · '+pair+' · 15m rango / 5m entradas · '+days+' días · Solo simulación histórica.');
-  btResultLine('Reglas fijas: 24 velas 15m, 2 contactos por extremo, sin tendencia fuerte; rechazo 5m cerca del borde; objetivo cerca del centro; SL fuera del rango; mínimo 1,2R y costes cubiertos; 1 posición y rearmado tras pasar por el centro.');
-  const first=backtestRangePro(rows.slice(0,split),settings);
-  const secondRows=rows.slice(Math.max(0,split-90)),second=backtestRangePro(secondRows,settings);
-  rangeShowStats('PRIMER 70%',first,rows[0].t);
-  rangeShowStats('ÚLTIMO 30%',second,rows[split].t);
+  btResultLine('COMPARACIÓN INDEPENDIENTE: original TP cerca del centro y SL 12% fuera del rango vs alternativa TP 18% antes del extremo opuesto y SL 6% fuera. Misma detección 15m, entradas 5m y filtro mínimo 1,2R, sin cambiar Paper.');
+  const first=backtestRangePro(rows.slice(0,split),settings),firstAlt=backtestRangeOpposite(rows.slice(0,split),settings);
+  const secondRows=rows.slice(Math.max(0,split-90)),second=backtestRangePro(secondRows,settings),secondAlt=backtestRangeOpposite(secondRows,settings);
+  rangeShowStats('PRIMER 70% · ORIGINAL',first,rows[0].t);
+  rangeShowStats('PRIMER 70% · OBJETIVO OPUESTO',firstAlt,rows[0].t);
+  rangeShowStats('ÚLTIMO 30% · ORIGINAL',second,rows[split].t);
+  rangeShowStats('ÚLTIMO 30% · OBJETIVO OPUESTO',secondAlt,rows[split].t);
+  btResultLine('IMPORTANTE: el objetivo opuesto es más lejano y puede acertar menos; no reduce la exigencia 1,2R. Si ninguna variante es prometedora, la próxima hipótesis será rangos 1h y entradas 5m.');
   btResultLine('Ninguna entrada se genera usando la vela 5m actual aún sin cerrar; rangos 15m solo usan velas 15m completas. Si SL y TP se alcanzan en una vela se prioriza SL.');
   btResultLine('No hay órdenes Paper ni reales. Histórico ya expuesto: resultados exploratorios, no validación futura. No incluye financiación ni liquidez de libro.');
  }catch(e){el.textContent='RANGE PRO: prueba no completada · '+String(e.message||e)}
