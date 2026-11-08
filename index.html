@@ -1230,7 +1230,7 @@ function backtestRangeHourly(rows,options){
  }
  for(let i=150;i<rows.length;i++){
   const bar=rows[i],last=rows[i-1];
-  // Only a completely closed 15m candle can update range detection.
+  // Only a completely closed 1h candle can update range detection.
   while(h<closed60.length&&closed60[h].end<=bar.t){h++}
   if(h&&closed60[h-1].end!==lastZoneEnd){
    const local=closed60.slice(Math.max(0,h-12),h);
@@ -1243,7 +1243,7 @@ function backtestRangeHourly(rows,options){
    draw(balance+sign*(worst-open.entry)*open.qty-(open.entry+worst)*open.qty*fee/100);
    // A break is defined by a fully closed 1h bar, acted on at next 5m opening.
    const last60=h?closed60[h-1]:null;
-   if(last15&&last15.end===bar.t&&(last15.c<open.low-.15*(open.high-open.low)||last15.c>open.high+.15*(open.high-open.low))){
+   if(last60&&last60.end===bar.t&&(last60.c<open.low-.15*(open.high-open.low)||last60.c>open.high+.15*(open.high-open.low))){
     close(open,bar.o,'RANGE BREAK',bar,i);
    }else{
     const sl=long?bar.l<=open.stop:bar.h>=open.stop,tp=long?bar.h>=open.take:bar.l<=open.take;
