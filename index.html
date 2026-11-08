@@ -13,7 +13,7 @@
 <div class="formgrid"><div class="field"><label>Par de prueba</label><select id="btPair"><option value="BTCUSDT">BTCUSDT</option><option value="ETHUSDT">ETHUSDT</option><option value="SOLUSDT">SOLUSDT</option><option value="PEPEUSDT">PEPEUSDT</option><option value="TAOUSDT">TAOUSDT</option><option value="NEARUSDT">NEARUSDT</option><option value="AVAXUSDT">AVAXUSDT</option><option value="DOGEUSDT">DOGEUSDT</option><option value="LINKUSDT">LINKUSDT</option><option value="ARBUSDT">ARBUSDT</option></select></div>
 <div class="field"><label>Período histórico</label><select id="btCount"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></div>
 <div class="field"><label>Deslizamiento estimado por ejecución (%)</label><input id="btSlip" type="number" min="0" max="1" step="0.01" value="0.03"></div></div>
-<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btHourly">▶ Probar rango 1h · entradas 5m</button><button class="btn primary" id="btHourlyMulti">▶ Rango 1h/5m · comparar 10 criptos (30 días)</button><button class="btn blue" id="btStopsCompare">▶ Comparar Stop 6% vs 12% · 10 criptos</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
+<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btHourly">▶ Probar rango 1h · entradas 5m</button><button class="btn primary" id="btHourlyMulti">▶ Rango 1h/5m · comparar 10 criptos (30 días)</button><button class="btn blue" id="btStopsCompare">▶ Comparar Stop 6% vs 12% · 10 criptos</button><button class="btn primary" id="btConfirmCompare">▶ Comparar entrada directa vs vela confirmada · 10 criptos</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
 <div id="btResults" class="notice" aria-live="polite">Sin prueba realizada.</div>
 <p class="dim">Modelo: señal al cierre de vela, entrada a la apertura de la vela siguiente, SL/TP intravela (si ambos se alcanzan: SL), comisiones por lado y deslizamiento estimado. No contempla financiación, liquidaciones, profundidad ni deslizamiento real; no es una garantía de rentabilidad. El drawdown incluye una estimación conservadora de pérdidas flotantes. El backtest separa el primer 70% y último 30% sin optimizar parámetros. V11 es solo experimental y NO se utiliza para abrir posiciones.</p></section>
 <section class="panel"><h2>◷ HISTORIAL DE OPERACIONES CERRADAS</h2><div class="grid"><div class="stat"><label>Par más rentable</label><div class="value green-t" id="bestPair">—</div><small id="bestPairSub">Sin operaciones</small></div><div class="stat"><label>Par con más aciertos</label><div class="value blue-t" id="mostWins">—</div><small id="mostWinsSub">Sin operaciones</small></div></div><div class="tablewrap" style="margin-top:18px"><table><thead><tr><th>Fecha / Hora</th><th>Par</th><th>Tipo</th><th>P. entrada</th><th>P. salida</th><th>P&L USDT</th></tr></thead><tbody id="history"></tbody></table></div></section><footer>SUAREZ Algo Bot · Prototipo independiente RANGE PRO · Sin conexión de órdenes reales<br>Los datos históricos de las capturas de Base44 no se importaron.</footer></main>
@@ -692,7 +692,7 @@ function showBacktest(rows,pair,settings){
  }
  btResultLine('V11, V12, V13, V15 y V17 son solo backtests experimentales, no abren operaciones Paper. Mismo capital y costes. No usar para dinero real.');
 }
-function btUi(busy){btBusy=busy;$('btRun').disabled=busy;$('btCompare').disabled=busy;$('btRobust').disabled=busy;$('btAudit19').disabled=busy;$('btMarkets20').disabled=busy;$('btQuality21').disabled=busy;$('btRange').disabled=busy;$('btHourly').disabled=busy;$('btHourlyMulti').disabled=busy;$('btStopsCompare').disabled=busy;$('btCancel').disabled=!busy}
+function btUi(busy){btBusy=busy;$('btRun').disabled=busy;$('btCompare').disabled=busy;$('btRobust').disabled=busy;$('btAudit19').disabled=busy;$('btMarkets20').disabled=busy;$('btQuality21').disabled=busy;$('btRange').disabled=busy;$('btHourly').disabled=busy;$('btHourlyMulti').disabled=busy;$('btStopsCompare').disabled=busy;$('btConfirmCompare').disabled=busy;$('btCancel').disabled=!busy}
 async function runBacktest(compare=false){
  btUi(true);btController=new AbortController();$('btResults').textContent='Descargando datos...';
  try{
@@ -1214,7 +1214,7 @@ function rangeFindZone1h(closed60){
  return {low,high,width,mid,end:closed60.at(-1).end};
 }
 
-function backtestRangeHourly(rows,options,stopBuffer=0.06){
+function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false){
  const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed60=rangeAggregate1h(rows);
  let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
  const stats={lowRange:0,noZone:0,weakReward:0,rangeBroken:0,sl:0,tp:0,invalid:0,invalidRisk:0,noReward:0,rrRejected:0,costRejected:0,marginRejected:0,eligible:0,hourlyBreaks:0,hourlyBreaksWhileOpen:0,hourlyBreaksWhileFlat:0,stopBeforeHourlyClose:0,stopsLaterHourlyBreak:0,stopsWithoutHourlyBreak:0,rrSamples:[],costSamples:[],marginSamples:[],examples:[]};
@@ -1279,8 +1279,14 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06){
   // Re-arm only after price has visibly returned to the middle of the range.
   if(last.c>=low+.38*width&&last.c<=low+.62*width)rearmed=true;
   if(open||!rearmed||i-lastClose<=3||balance<=0)continue;
-  const bullish=last.l<=low+.18*width&&last.c>=low+.08*width&&last.c<=low+.34*width&&last.c>last.o;
-  const bearish=last.h>=high-.18*width&&last.c<=high-.08*width&&last.c>=high-.34*width&&last.c<last.o;
+  // On confirmation variant the rejection is TWO fully closed 5m candles back.
+  // The next closed 5m candle must close beyond the rejecting candle's high/low.
+  // Order is placed only at the opening of the following candle, without look-ahead.
+  const rejection=confirmNextCandle?rows[i-2]:last;
+  const bullishReject=rejection.l<=low+.18*width&&rejection.c>=low+.08*width&&rejection.c<=low+.34*width&&rejection.c>rejection.o;
+  const bearishReject=rejection.h>=high-.18*width&&rejection.c<=high-.08*width&&rejection.c>=high-.34*width&&rejection.c<rejection.o;
+  const bullish=confirmNextCandle?(bullishReject&&last.c>rejection.h&&last.c>last.o&&last.c>low&&last.c<high):bullishReject;
+  const bearish=confirmNextCandle?(bearishReject&&last.c<rejection.l&&last.c<last.o&&last.c>low&&last.c<high):bearishReject;
   if(!bullish&&!bearish)continue;
   signals++;
   const long=bullish,sign=long?1:-1,entry=bar.o*(1+sign*rate);
@@ -1499,6 +1505,58 @@ async function runHourlyStopsComparison(){
  }finally{btUi(false);btController=null}
 }
 $('btStopsCompare').onclick=runHourlyStopsComparison;
+
+async function runHourlyConfirmationComparison(){
+ btUi(true);btController=new AbortController();
+ const el=$('btResults'),ctl=btController;
+ el.textContent='Preparando comparación de confirmación 5m en 10 criptomonedas…';
+ try{
+  if(Number($('tf').value)!==5)throw Error('Seleccioná temporalidad de 5 minutos.');
+  const settings=btSettings(),pairs=PAIRS.slice(),days=30,done=[],failures=[];
+  for(let i=0;i<pairs.length;i++){
+   const pair=pairs[i];
+   if(ctl.signal.aborted)throw Error('Consulta cancelada');
+   try{
+    const rows=await btFetchDays(pair,days,ctl,(p,page,max,count,expected)=>{el.textContent='CONFIRMACIÓN 5m · '+(i+1)+'/'+pairs.length+' · '+p+' · página '+page+' · '+count+'/'+expected+' velas aprox.';});
+    if(rows.length<700)throw Error('Historial insuficiente');
+    const cut=Math.floor(rows.length*.7),warmup=240;
+    const early=rows.slice(0,cut),late=rows.slice(Math.max(0,cut-warmup));
+    const baseA=backtestRangeHourly(early,settings,.06,false);
+    const confirmA=backtestRangeHourly(early,settings,.06,true);
+    const baseB=backtestRangeHourly(late,settings,.06,false);
+    const confirmB=backtestRangeHourly(late,settings,.06,true);
+    done.push({pair,
+     baseA:hourlyMultiStats(baseA,rows[0].t),confirmA:hourlyMultiStats(confirmA,rows[0].t),
+     baseB:hourlyMultiStats(baseB,rows[cut].t),confirmB:hourlyMultiStats(confirmB,rows[cut].t),
+     baseSignals:baseB.signals,confirmedSignals:confirmB.signals});
+   }catch(e){
+    if(ctl.signal.aborted)throw e;
+    failures.push({pair,error:String(e.message||e)});
+   }
+   el.textContent='CONFIRMACIÓN 5m · '+(i+1)+'/'+pairs.length+' pares · '+done.length+' procesados · '+failures.length+' errores.';
+  }
+  el.textContent='';
+  btResultLine('RANGE SCALPER PRO · COMPARACIÓN ENTRADAS · rango 1h / velas 5m · 30 días · 10 criptos.');
+  btResultLine('DIRECTA: rechazo 5m cerrado y entrada en vela siguiente. CONFIRMADA: rechazo cerrado + segunda vela 5m que cierra más allá del máximo/mínimo de rechazo y dentro del rango; entrada al abrir la tercera vela. Stop 6% y objetivo 18% antes del otro extremo en ambas.');
+  btResultLine('Ambas variantes usan mismo capital inicial por par, mismos costos y controles de riesgo. La confirmación puede reducir señales, alterar precios de entrada y modificar operaciones.');
+  for(const x of done){
+   btResultLine(x.pair+' · PRIMER 70% · DIRECTA: '+hourlyMultiFormat(x.baseA));
+   btResultLine(x.pair+' · PRIMER 70% · CONFIRMADA: '+hourlyMultiFormat(x.confirmA));
+   btResultLine(x.pair+' · ÚLTIMO 30% · DIRECTA: '+hourlyMultiFormat(x.baseB));
+   btResultLine(x.pair+' · ÚLTIMO 30% · CONFIRMADA: '+hourlyMultiFormat(x.confirmB));
+   btResultLine(x.pair+' · Último 30% · señales directas '+x.baseSignals+' vs confirmadas '+x.confirmedSignals+'.');
+   if(Math.min(x.baseB.count,x.confirmB.count)<20)btResultLine(x.pair+' · muestra insuficiente en último 30% para sacar conclusiones.');
+  }
+  for(const f of failures)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
+  const positive=k=>done.filter(x=>x[k].net>0).length;
+  const eligible=done.filter(x=>['baseA','confirmA','baseB','confirmB'].every(k=>x[k].count>=20));
+  btResultLine('RESUMEN · '+done.length+'/'+pairs.length+' pares · '+failures.length+' errores · positivos último 30%: directa '+positive('baseB')+'/'+done.length+', confirmada '+positive('confirmB')+'/'+done.length+' · pares con al menos 20 trades en cada período y variante '+eligible.length+'.');
+  btResultLine('Backtest experimental sobre datos ya examinados, no prueba de rentabilidad. No combina carteras ni correlaciones. Paper y Bybit real no se modifican.');
+ }catch(e){el.textContent='Comparación interrumpida: '+String(e.message||e)+'. Resultados incompletos no se consideran válidos.'}
+ finally{btUi(false);btController=null}
+}
+$('btConfirmCompare').onclick=runHourlyConfirmationComparison;
+
 
 
 
