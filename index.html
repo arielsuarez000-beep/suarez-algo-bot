@@ -1177,9 +1177,9 @@ function backtestRangeOpposite(rows,options){
 function rangeAggregate1h(rows){
  const out=[];let group=null;
  for(const c of rows){
-  const slot=Math.floor(c.t/33300000)*33300000;
+  const slot=Math.floor(c.t/3600000)*3600000;
   if(group&&slot!==group.t){
-   if(group.count===12&&group.last===group.t+3300000)out.push({...group,end:group.t+33300000});
+   if(group.count===12&&group.last===group.t+3300000)out.push({...group,end:group.t+3600000});
    group=null;
   }
   if(!group)group={t:slot,o:c.o,h:c.h,l:c.l,c:c.c,v:c.v,count:1,last:c.t};
