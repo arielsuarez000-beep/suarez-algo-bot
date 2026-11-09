@@ -11,9 +11,9 @@
 <section class="panel" id="backtestPanel"><h2>▤ BACKTEST HISTÓRICO · SCALP PRO</h2><div class="notice"><strong>RANGE SCALPER PRO · Rango 1h / 5m · Auditoría de rupturas · Solo backtest</strong><p class="dim">V21 mide distancia a zona, retardo entre ruptura/retest/confirmación, fricción vs objetivo y resultados por tipo de entrada. No modifica condiciones de trading. V20 compara V17A sin alterar parámetros en BTC, ETH, SOL y los demás pares, separando cronológicamente el 70% inicial del 30% final. Reporta los errores sin inventar resultados. V19 añade conciliación de pérdidas brutas, comisiones, slippage supuesto, ganancia/pérdida media, LONG/SHORT y comprobaciones del simulador de V17A. V18 añade una prueba de consistencia de V15 vs V17A (ATR ≥0,15%) en tres bloques cronológicos no superpuestos, sin ajustar parámetros. Estos períodos históricos pueden haberse examinado previamente: no constituyen validación genuinamente futura. V17 compara V15 sin cambios contra: filtro ATR ≥0,15% al entrar, cierre por tiempo tras 7 velas completas, y ambos juntos. Los resultados se calculan por separado; no se activan operaciones nuevas. Conserva V10–V14 sin modificar sus reglas ni resultados. V13 exige ruptura de 20 velas con volumen, retest dentro de 8 velas posteriores y confirmación al cierre; filtro de tendencia superior, stop técnico con ATR y objetivo 2R. No abre órdenes Paper. V11 usa filtro EMA50 de temporalidad 3× superior (15m si probás 5m), Stop Loss inicial 1,5 ATR, TP inicial 2,5 ATR, break-even al alcanzar 1 ATR y trailing de 1,5 ATR desde 2 ATR. Los ajustes se aplican desde la vela posterior a la confirmación, nunca usando información futura.</p></div>
 <p class="dim">Prueba independiente: no abre, modifica ni cierra operaciones Paper. Usa velas cerradas de Bybit y la estrategia Scalp Confluencia PRO.</p>
 <div class="formgrid"><div class="field"><label>Par de prueba</label><select id="btPair"><option value="BTCUSDT">BTCUSDT</option><option value="ETHUSDT">ETHUSDT</option><option value="SOLUSDT">SOLUSDT</option><option value="PEPEUSDT">PEPEUSDT</option><option value="TAOUSDT">TAOUSDT</option><option value="NEARUSDT">NEARUSDT</option><option value="AVAXUSDT">AVAXUSDT</option><option value="DOGEUSDT">DOGEUSDT</option><option value="LINKUSDT">LINKUSDT</option><option value="ARBUSDT">ARBUSDT</option></select></div>
-<div class="field"><label>Período histórico</label><select id="btCount"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></div>
+<div class="field"><label>Período histórico</label><select id="btCount"><option value="7">7 días</option><option value="30">30 días</option><option value="90">90 días</option><option value="180" selected>180 días · 6 meses</option></select></div>
 <div class="field"><label>Deslizamiento estimado por ejecución (%)</label><input id="btSlip" type="number" min="0" max="1" step="0.01" value="0.03"></div></div>
-<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btHourly">▶ Probar rango 1h · entradas 5m</button><button class="btn primary" id="btHourlyMulti">▶ Rango 1h/5m · comparar 10 criptos (30 días)</button><button class="btn blue" id="btStopsCompare">▶ Comparar Stop 6% vs 12% · 10 criptos</button><button class="btn primary" id="btConfirmCompare">▶ Comparar entrada directa vs vela confirmada · 10 criptos</button><button class="btn blue" id="btVisualAudit">▥ Auditoría visual · 5 pérdidas en gráfico</button><button class="btn primary" id="btGuardRange">▶ Corregir entradas falsas · comparar filtro protegido</button><button class="btn blue" id="btGuardMulti">▶ Filtro protegido · comparar 10 criptos (30 días)</button><button class="btn primary" id="btSidewaysMulti">▶ Auditar rangos laterales · 10 criptos</button><button class="btn blue" id="btProgressMulti">▶ Rebote hacia centro · comparar 10 criptos</button><button class="btn primary" id="btExcursionMulti">▶ Diagnosticar recorrido y pérdidas · 10 criptos</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
+<div class="line" style="margin-top:14px"><button class="btn primary" id="btRun">▶ Comparar V15 vs V17</button><button class="btn blue" id="btRobust">Validar ATR · 3 bloques históricos</button><button class="btn blue" id="btAudit19">V19 · Auditar rentabilidad V17A</button><button class="btn blue" id="btMarkets20">V20 · Comparar V17A en 10 pares (30 días)</button><button class="btn blue" id="btQuality21">V21 · Auditar calidad de entradas V17A</button><button class="btn primary" id="btRange">▶ Comparar RANGE original vs objetivo opuesto · 15m/5m</button><button class="btn blue" id="btHourly">▶ Probar rango 1h · entradas 5m</button><button class="btn primary" id="btHourlyMulti">▶ Rango 1h/5m · comparar 10 criptos (30 días)</button><button class="btn blue" id="btStopsCompare">▶ Comparar Stop 6% vs 12% · 10 criptos</button><button class="btn primary" id="btConfirmCompare">▶ Comparar entrada directa vs vela confirmada · 10 criptos</button><button class="btn blue" id="btVisualAudit">▥ Auditoría visual · 5 pérdidas en gráfico</button><button class="btn primary" id="btGuardRange">▶ Corregir entradas falsas · comparar filtro protegido</button><button class="btn blue" id="btGuardMulti">▶ Filtro protegido · comparar 10 criptos (30 días)</button><button class="btn primary" id="btSidewaysMulti">▶ Auditar rangos laterales · 10 criptos</button><button class="btn blue" id="btProgressMulti">▶ Rebote hacia centro · comparar 10 criptos</button><button class="btn primary" id="btExcursionMulti">▶ Diagnosticar recorrido y pérdidas · 10 criptos</button><button class="btn blue" id="btCompareExits">▶ AUDITORÍA 180 DÍAS · salidas original / equilibrio / parcial · 10 pares</button><button class="btn blue" id="btCompare">Comparar 10 pares · 7 días</button><button class="btn" id="btCancel" disabled>Cancelar consulta</button></div>
 <div id="btResults" class="notice" aria-live="polite">Sin prueba realizada.</div>
 <p class="dim">Modelo: señal al cierre de vela, entrada a la apertura de la vela siguiente, SL/TP intravela (si ambos se alcanzan: SL), comisiones por lado y deslizamiento estimado. No contempla financiación, liquidaciones, profundidad ni deslizamiento real; no es una garantía de rentabilidad. El drawdown incluye una estimación conservadora de pérdidas flotantes. El backtest separa el primer 70% y último 30% sin optimizar parámetros. V11 es solo experimental y NO se utiliza para abrir posiciones.</p></section>
 <section class="panel"><h2>◷ HISTORIAL DE OPERACIONES CERRADAS</h2><div class="grid"><div class="stat"><label>Par más rentable</label><div class="value green-t" id="bestPair">—</div><small id="bestPairSub">Sin operaciones</small></div><div class="stat"><label>Par con más aciertos</label><div class="value blue-t" id="mostWins">—</div><small id="mostWinsSub">Sin operaciones</small></div></div><div class="tablewrap" style="margin-top:18px"><table><thead><tr><th>Fecha / Hora</th><th>Par</th><th>Tipo</th><th>P. entrada</th><th>P. salida</th><th>P&L USDT</th></tr></thead><tbody id="history"></tbody></table></div></section><footer>SUAREZ Algo Bot · Prototipo independiente RANGE PRO · Sin conexión de órdenes reales<br>Los datos históricos de las capturas de Base44 no se importaron.</footer></main>
@@ -88,7 +88,7 @@ async function btFetchPage(pair,endTime,ctl){
   const timeout=setTimeout(()=>ctl.abort('timeout'),15000);
   try{
    const cleanPair=String(pair).trim().toUpperCase();
-   if(!PAIRS.includes(cleanPair))throw Error('Par no reconocido: '+cleanPair);
+   if(!PAIRS.includes(cleanPair)&&cleanPair!=='1000PEPEUSDT')throw Error('Par no reconocido: '+cleanPair);
    const interval=String($('tf').value);
    const url=host+'/v5/market/kline?category=linear&symbol='+encodeURIComponent(cleanPair)+'&interval='+encodeURIComponent(interval)+'&limit=1000&end='+Math.floor(endTime);
    const r=await fetch(url,{cache:'no-store',signal:ctl.signal});
@@ -692,7 +692,7 @@ function showBacktest(rows,pair,settings){
  }
  btResultLine('V11, V12, V13, V15 y V17 son solo backtests experimentales, no abren operaciones Paper. Mismo capital y costes. No usar para dinero real.');
 }
-function btUi(busy){btBusy=busy;$('btRun').disabled=busy;$('btCompare').disabled=busy;$('btRobust').disabled=busy;$('btAudit19').disabled=busy;$('btMarkets20').disabled=busy;$('btQuality21').disabled=busy;$('btRange').disabled=busy;$('btHourly').disabled=busy;$('btHourlyMulti').disabled=busy;$('btStopsCompare').disabled=busy;$('btConfirmCompare').disabled=busy;$('btVisualAudit').disabled=busy;$('btGuardRange').disabled=busy;$('btGuardMulti').disabled=busy;$('btSidewaysMulti').disabled=busy;$('btProgressMulti').disabled=busy;$('btExcursionMulti').disabled=busy;$('btCancel').disabled=!busy}
+function btUi(busy){btBusy=busy;$('btRun').disabled=busy;$('btCompare').disabled=busy;$('btRobust').disabled=busy;$('btAudit19').disabled=busy;$('btMarkets20').disabled=busy;$('btQuality21').disabled=busy;$('btRange').disabled=busy;$('btHourly').disabled=busy;$('btHourlyMulti').disabled=busy;$('btStopsCompare').disabled=busy;$('btConfirmCompare').disabled=busy;$('btVisualAudit').disabled=busy;$('btGuardRange').disabled=busy;$('btGuardMulti').disabled=busy;$('btSidewaysMulti').disabled=busy;$('btProgressMulti').disabled=busy;$('btExcursionMulti').disabled=busy;$('btCompareExits').disabled=busy;$('btCancel').disabled=!busy}
 async function runBacktest(compare=false){
  btUi(true);btController=new AbortController();$('btResults').textContent='Descargando datos...';
  try{
@@ -1874,6 +1874,119 @@ async function runRangeExcursionMulti(){
  finally{btUi(false);btController=null}
 }
 $('btExcursionMulti').onclick=runRangeExcursionMulti;
+
+
+/* Diagnostic replay of identical entries, no creation of replacement trades.
+   At bar close, a >=1R CLOSE arms protection for the next 5m bar.
+   A same-candle SL takes precedence; exit-bar extremes are never used after exit.
+   Partial closes at next bar open, with adverse slippage and fees.
+   This is NOT a portfolio simulation: changed exits could change future entries. */
+function rangeMatchedExit(trade,rows,settings,mode){
+ if(mode==='original')return {net:trade.pnl,protected:false,reason:trade.reason};
+ const sign=trade.side==='LONG'?1:-1,qty=trade.qty,entry=trade.entry;
+ const risk=Math.abs(entry-trade.stop),f=settings.fee/100,s=settings.slippage/100;
+ if(!(risk>0&&qty>0))throw Error('Invalid trade risk/qty');
+ const start=rows.findIndex(b=>b.t===trade.entryTime);
+ const end=rows.findIndex(b=>b.t===trade.date);
+ if(start<0||end<start)throw Error('Trade candles missing');
+ let remaining=qty,net=-(entry*qty*f),armed=false,protectedAt=false,partial=false;
+ const stopBE=sign===1?entry*(1+f)/(1-f)/(1-s):entry*(1-f)/(1+f)/(1+s);
+ // Fee-adjusted break-even can be inside/outside original stop; never loosen the stop.
+ const be=sign===1?Math.max(trade.stop,stopBE):Math.min(trade.stop,stopBE);
+ const exit=(raw,amount,alreadySlipped=false)=>{
+  const px=alreadySlipped?raw:raw*(1-sign*s);
+  net+=sign*(px-entry)*amount-px*amount*f;
+  remaining-=amount;
+ };
+ for(let i=start;i<=end;i++){
+  const b=rows[i],last=i===end;
+  // Preserve the original engine's event priority: a confirmed hourly range break
+  // closes at the bar open before intrabar SL/TP checks. On the terminal candle,
+  // replay every exit variant at that same already-slipped execution price.
+  if(last&&trade.reason==='RANGE BREAK'){
+   if(mode==='partial'&&armed)protectedAt=true;
+   exit(trade.exit,remaining,true);
+   return {net,protected:protectedAt,reason:trade.reason};
+  }
+  const stop=mode==='breakEven'&&armed?be:trade.stop;
+  // Favor adverse gaps at opening before any discretionary partial.
+  if(sign*(b.o-stop)<=0){exit(b.o,remaining);return {net,protected:protectedAt,reason:'SL/GAP'}}
+  if(mode==='partial'&&armed&&!partial){
+   exit(b.o,qty*.5);partial=true;protectedAt=true;
+  }
+  const hitStop=sign===1?b.l<=stop:b.h>=stop;
+  const hitTarget=sign===1?b.h>=trade.take:b.l<=trade.take;
+  if(hitStop||hitTarget){
+   // Keep baseline exit on terminal bar, preserving its gap fill and fees.
+   if(last&&mode==='partial'&&!partial){exit(trade.exit,remaining,true);return {net,protected:protectedAt,reason:trade.reason}}
+   if(last&&mode==='breakEven'&&!armed){exit(trade.exit,remaining,true);return {net,protected:protectedAt,reason:trade.reason}}
+   exit(hitStop?stop:trade.take,remaining);
+   return {net,protected:protectedAt,reason:hitStop?'SL':'TP'};
+  }
+  if(last){exit(trade.exit,remaining,true);return {net,protected:protectedAt,reason:trade.reason}}
+  // A closing-price confirmation avoids guessing whether 1R occurred before intrabar SL.
+  if(!armed&&sign*(b.c-entry)>=risk){
+   armed=true;if(mode==='breakEven')protectedAt=true;
+  }
+ }
+ throw Error('Unclosed matched trade');
+}
+function rangeMatchedExitStats(trades,rows,settings){
+ const modes=['original','breakEven','partial'];
+ const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,maxDD:0,peak:settings.capital};
+ for(const t of [...trades].sort((a,b)=>a.entryTime-b.entryTime)){
+  for(const mode of modes){
+   const x=rangeMatchedExit(t,rows,settings,mode),v=out[mode];
+   v.n++;v.net+=x.net;if(x.net>0){v.wins++;v.grossWin+=x.net}else if(x.net<0)v.grossLoss+=Math.abs(x.net);
+   if(x.protected)v.protected++;
+   const equity=settings.capital+v.net;v.peak=Math.max(v.peak,equity);
+   v.maxDD=Math.max(v.maxDD,(v.peak-equity)/Math.max(v.peak,.000001)*100);
+  }
+ }
+ for(const mode of modes){const v=out[mode];v.winRate=v.n?100*v.wins/v.n:0;v.profitFactor=v.grossLoss?v.grossWin/v.grossLoss:(v.grossWin?null:0)}
+ return out;
+}
+async function runRangeMatchedExitMulti(){
+ btUi(true);btController=new AbortController();
+ const ctl=btController,el=$('btResults'),pairs=PAIRS.map(p=>p==='PEPEUSDT'?'1000PEPEUSDT':p),ok=[],failed=[];
+ el.textContent='Comparando 3 salidas con las mismas entradas…';
+ try{
+  if(Number($('tf').value)!==5)throw Error('Seleccioná 5 minutos.');
+  const settings=btSettings();
+  for(let i=0;i<pairs.length;i++){
+   const pair=pairs[i];if(ctl.signal.aborted)throw Error('Consulta cancelada');
+   try{
+    const rows=await btFetchDays(pair,180,ctl,(p,page,max,count,expected)=>{
+     el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+p+' · '+count+'/'+expected+' velas.';
+    });
+    if(rows.length<700)throw Error('Historial insuficiente');
+    const cut=Math.floor(rows.length*.7),start=rows[cut].t,warm=240;
+    const firstRows=rows.slice(0,cut),lastRows=rows.slice(Math.max(0,cut-warm));
+    const first=backtestRangeHourly(firstRows,settings,.06,false,false,false,false);
+    const last=backtestRangeHourly(lastRows,settings,.06,false,false,false,false);
+    ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
+      last:rangeMatchedExitStats(last.trades.filter(t=>t.entryTime>=start),lastRows,settings)});
+   }catch(e){if(ctl.signal.aborted)throw e;failed.push({pair,error:String(e.message||e)})}
+   el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+ok.length+' válidos · '+failed.length+' errores.';
+  }
+  el.textContent='';
+  btResultLine('SALIDAS COMPARADAS · rango 1h / entrada 5m · 180 días · 10 pares · solo simulación, sin órdenes Paper/Bybit.');
+  btResultLine('Mismas entradas, cantidad y stop/objetivo original. ORIGINAL: cierre de referencia. EQUILIBRIO: una vela 5m debe CERRAR al menos a +1R; desde la siguiente vela se coloca stop al precio neto de equilibrio incluyendo comisiones y slippage supuesto. PARCIAL: con esa confirmación se vende 50% a la siguiente apertura y el resto conserva stop/objetivo inicial. Stop tiene prioridad si también toca objetivo en una vela.');
+  btResultLine('La prueba es por operación emparejada: NO permite nuevas entradas después de salidas anticipadas. No representa una cartera ni el cambio completo de rendimiento de una estrategia. Los extremos intravela no permiten determinar el orden exacto de ejecución.');
+  const fmtStat=v=>v.n+' ops, '+fmt(v.winRate,1)+'% acierto, neto '+fmt(v.net)+' USDT, PF '+(v.profitFactor===null?'∞':fmt(v.profitFactor))+' , DD '+fmt(v.maxDD,2)+'%, activaciones '+v.protected;
+  for(const x of ok){
+   for(const [label,v] of [['PRIMER 70%',x.first],['ÚLTIMO 30%',x.last]]){
+    btResultLine(x.pair+' · '+label+' · ORIGINAL '+fmtStat(v.original)+' · EQUILIBRIO '+fmtStat(v.breakEven)+' · PARCIAL '+fmtStat(v.partial)+'.');
+    if(v.original.n<30)btResultLine(x.pair+' · '+label+' · muestra insuficiente (<30 operaciones); no usar para elegir una salida.');
+   }
+  }
+  for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
+  btResultLine('RESUMEN: '+ok.length+'/'+pairs.length+' procesados · '+failed.length+' errores · positivo último 30%: original '+ok.filter(x=>x.last.original.net>0).length+'/'+ok.length+', equilibrio '+ok.filter(x=>x.last.breakEven.net>0).length+'/'+ok.length+', parcial '+ok.filter(x=>x.last.partial.net>0).length+'/'+ok.length+'.');
+  btResultLine('Exploración sobre historia conocida. No elegir parámetros por estos resultados ni usar dinero real. La ejecución y financiación reales no están modeladas.');
+ }catch(e){el.textContent='Comparación incompleta: '+String(e.message||e)+'. No se usan resultados parciales.'}
+ finally{btUi(false);btController=null}
+}
+$('btCompareExits').onclick=runRangeMatchedExitMulti;
 
 function btDrawAuditChart(canvas,rows,trade){
  const ctx=canvas.getContext('2d');
