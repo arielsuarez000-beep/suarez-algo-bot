@@ -1900,6 +1900,14 @@ function rangeMatchedExit(trade,rows,settings,mode){
  };
  for(let i=start;i<=end;i++){
   const b=rows[i],last=i===end;
+  // Preserve the original engine's event priority: a confirmed hourly range break
+  // closes at the bar open before intrabar SL/TP checks. On the terminal candle,
+  // replay every exit variant at that same already-slipped execution price.
+  if(last&&trade.reason==='RANGE BREAK'){
+   if(mode==='partial'&&armed)protectedAt=true;
+   exit(trade.exit,remaining,true);
+   return {net,protected:protectedAt,reason:trade.reason};
+  }
   const stop=mode==='breakEven'&&armed?be:trade.stop;
   // Favor adverse gaps at opening before any discretionary partial.
   if(sign*(b.o-stop)<=0){exit(b.o,remaining);return {net,protected:protectedAt,reason:'SL/GAP'}}
