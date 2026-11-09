@@ -1,4 +1,4 @@
-name: Range matched exits audit
+name: Range matched exits deterministic tests
 on:
   push:
     branches:
@@ -6,7 +6,6 @@ on:
     paths:
       - 'index.html'
       - 'tests/range-matched-exits.test.cjs'
-      - 'tests/range-matched-exits-historical.cjs'
       - '.github/workflows/range-matched-exits.yml'
   pull_request:
     branches:
@@ -28,20 +27,5 @@ jobs:
       - name: Verify matched exit replay
         run: node tests/range-matched-exits.test.cjs
 
-  bybit-historical-audit:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Run 30-day Bybit public-history audit
-        run: node tests/range-matched-exits-historical.cjs
-      - name: Publish JSON report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: range-matched-exits-report
-          path: artifacts/range-matched-exits-report.json
-          if-no-files-found: ignore
+
+# Bybit historical data is audited from the user's browser because GitHub-hosted runners receive HTTP 403.
