@@ -1933,13 +1933,17 @@ function rangeMatchedExit(trade,rows,settings,mode){
 }
 function rangeMatchedExitStats(trades,rows,settings){
  const modes=['original','breakEven','partial'];
- const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0};
- for(const t of trades){
+ const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,maxDD:0,peak:settings.capital};
+ for(const t of [...trades].sort((a,b)=>a.entryTime-b.entryTime)){
   for(const mode of modes){
    const x=rangeMatchedExit(t,rows,settings,mode),v=out[mode];
-   v.n++;v.net+=x.net;if(x.net>0)v.wins++;if(x.protected)v.protected++;
+   v.n++;v.net+=x.net;if(x.net>0){v.wins++;v.grossWin+=x.net}else if(x.net<0)v.grossLoss+=Math.abs(x.net);
+   if(x.protected)v.protected++;
+   const equity=settings.capital+v.net;v.peak=Math.max(v.peak,equity);
+   v.maxDD=Math.max(v.maxDD,(v.peak-equity)/Math.max(v.peak,.000001)*100);
   }
  }
+ for(const mode of modes){const v=out[mode];v.winRate=v.n?100*v.wins/v.n:0;v.profitFactor=v.grossLoss?v.grossWin/v.grossLoss:(v.grossWin?null:0)}
  return out;
 }
 async function runRangeMatchedExitMulti(){
@@ -1969,11 +1973,11 @@ async function runRangeMatchedExitMulti(){
   btResultLine('SALIDAS COMPARADAS · rango 1h / entrada 5m · 30 días · 10 pares · solo simulación, sin órdenes Paper/Bybit.');
   btResultLine('Mismas entradas, cantidad y stop/objetivo original. ORIGINAL: cierre de referencia. EQUILIBRIO: una vela 5m debe CERRAR al menos a +1R; desde la siguiente vela se coloca stop al precio neto de equilibrio incluyendo comisiones y slippage supuesto. PARCIAL: con esa confirmación se vende 50% a la siguiente apertura y el resto conserva stop/objetivo inicial. Stop tiene prioridad si también toca objetivo en una vela.');
   btResultLine('La prueba es por operación emparejada: NO permite nuevas entradas después de salidas anticipadas. No representa una cartera ni el cambio completo de rendimiento de una estrategia. Los extremos intravela no permiten determinar el orden exacto de ejecución.');
-  const fmtStat=v=>v.n+' ops, '+v.wins+' ganadoras, neto '+fmt(v.net)+' USDT, activaciones '+v.protected;
+  const fmtStat=v=>v.n+' ops, '+fmt(v.winRate,1)+'% acierto, neto '+fmt(v.net)+' USDT, PF '+(v.profitFactor===null?'∞':fmt(v.profitFactor))+' , DD '+fmt(v.maxDD,2)+'%, activaciones '+v.protected;
   for(const x of ok){
    for(const [label,v] of [['PRIMER 70%',x.first],['ÚLTIMO 30%',x.last]]){
     btResultLine(x.pair+' · '+label+' · ORIGINAL '+fmtStat(v.original)+' · EQUILIBRIO '+fmtStat(v.breakEven)+' · PARCIAL '+fmtStat(v.partial)+'.');
-    if(v.original.n<20)btResultLine(x.pair+' · '+label+' · muestra insuficiente (<20 operaciones).');
+    if(v.original.n<30)btResultLine(x.pair+' · '+label+' · muestra insuficiente (<30 operaciones); no usar para elegir una salida.');
    }
   }
   for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
