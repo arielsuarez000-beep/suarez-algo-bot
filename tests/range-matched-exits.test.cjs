@@ -44,7 +44,7 @@ const trade = (overrides = {}) => ({
 }
 {
   const rows = [
-    candle(0,100,101,99,100), candle(1,100,125,89,100),
+    candle(0,100,101,99,100), candle(1,100,110,99,105),
     candle(2,95,121,94,100)
   ];
   const result = run(trade({ date:2, exit:95, reason:'RANGE BREAK' }), rows, settings, 'partial');
