@@ -88,7 +88,7 @@ async function btFetchPage(pair,endTime,ctl){
   const timeout=setTimeout(()=>ctl.abort('timeout'),15000);
   try{
    const cleanPair=String(pair).trim().toUpperCase();
-   if(!PAIRS.includes(cleanPair))throw Error('Par no reconocido: '+cleanPair);
+   if(!PAIRS.includes(cleanPair)&&cleanPair!=='1000PEPEUSDT')throw Error('Par no reconocido: '+cleanPair);
    const interval=String($('tf').value);
    const url=host+'/v5/market/kline?category=linear&symbol='+encodeURIComponent(cleanPair)+'&interval='+encodeURIComponent(interval)+'&limit=1000&end='+Math.floor(endTime);
    const r=await fetch(url,{cache:'no-store',signal:ctl.signal});
@@ -1948,7 +1948,7 @@ function rangeMatchedExitStats(trades,rows,settings){
 }
 async function runRangeMatchedExitMulti(){
  btUi(true);btController=new AbortController();
- const ctl=btController,el=$('btResults'),pairs=PAIRS.slice(),ok=[],failed=[];
+ const ctl=btController,el=$('btResults'),pairs=PAIRS.map(p=>p==='PEPEUSDT'?'1000PEPEUSDT':p),ok=[],failed=[];
  el.textContent='Comparando 3 salidas con las mismas entradas…';
  try{
   if(Number($('tf').value)!==5)throw Error('Seleccioná 5 minutos.');
@@ -1956,7 +1956,7 @@ async function runRangeMatchedExitMulti(){
   for(let i=0;i<pairs.length;i++){
    const pair=pairs[i];if(ctl.signal.aborted)throw Error('Consulta cancelada');
    try{
-    const rows=await btFetchDays(pair,30,ctl,(p,page,max,count,expected)=>{
+    const rows=await btFetchDays(pair,180,ctl,(p,page,max,count,expected)=>{
      el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+p+' · '+count+'/'+expected+' velas.';
     });
     if(rows.length<700)throw Error('Historial insuficiente');
@@ -1970,7 +1970,7 @@ async function runRangeMatchedExitMulti(){
    el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+ok.length+' válidos · '+failed.length+' errores.';
   }
   el.textContent='';
-  btResultLine('SALIDAS COMPARADAS · rango 1h / entrada 5m · 30 días · 10 pares · solo simulación, sin órdenes Paper/Bybit.');
+  btResultLine('SALIDAS COMPARADAS · rango 1h / entrada 5m · 180 días · 10 pares · solo simulación, sin órdenes Paper/Bybit.');
   btResultLine('Mismas entradas, cantidad y stop/objetivo original. ORIGINAL: cierre de referencia. EQUILIBRIO: una vela 5m debe CERRAR al menos a +1R; desde la siguiente vela se coloca stop al precio neto de equilibrio incluyendo comisiones y slippage supuesto. PARCIAL: con esa confirmación se vende 50% a la siguiente apertura y el resto conserva stop/objetivo inicial. Stop tiene prioridad si también toca objetivo en una vela.');
   btResultLine('La prueba es por operación emparejada: NO permite nuevas entradas después de salidas anticipadas. No representa una cartera ni el cambio completo de rendimiento de una estrategia. Los extremos intravela no permiten determinar el orden exacto de ejecución.');
   const fmtStat=v=>v.n+' ops, '+fmt(v.winRate,1)+'% acierto, neto '+fmt(v.net)+' USDT, PF '+(v.profitFactor===null?'∞':fmt(v.profitFactor))+' , DD '+fmt(v.maxDD,2)+'%, activaciones '+v.protected;
