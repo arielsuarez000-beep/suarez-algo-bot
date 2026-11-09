@@ -3,13 +3,13 @@ const html=fs.readFileSync('index.html','utf8');
 function fn(name){
  const start=html.indexOf('function '+name+'('); if(start<0) throw Error('Missing '+name);
  let i=html.indexOf('{',start),depth=0,quote='',esc=false;
- for(;i<html.length;i++){const c=html[i];if(quote){if(esc)esc=false;else if(c==='\\\\')esc=true;else if(c===quote)quote='';continue;}
+ for(;i<html.length;i++){const c=html[i];if(quote){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===quote)quote='';continue;}
  if(c==="'"||c==='"'||c==='`'){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return html.slice(start,i+1);}
  throw Error('Unclosed '+name);
 }
 const names=['rangeAggregate1h','rangeFindZone1h','backtestRangeHourly','rangeMatchedExit','rangeMatchedExitStats'];
 const ctx={console,Error,Math,Number,Array,Map,Object,$:()=>({value:'5'})};vm.createContext(ctx);
-vm.runInContext(names.map(fn).join('\\n'),ctx);
+vm.runInContext(names.map(fn).join('\n'),ctx);
 const pairs=['BTCUSDT','ETHUSDT','SOLUSDT','PEPEUSDT','TAOUSDT','NEARUSDT','AVAXUSDT','DOGEUSDT','LINKUSDT','ARBUSDT'];
 const settings={capital:100,margin:10,leverage:10,riskPct:1,fee:0.055,slippage:0.03};
 const hosts=['https://api.bybit.com','https://api.bytick.com'],step=300000,days=30;
