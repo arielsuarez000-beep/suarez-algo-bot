@@ -1,0 +1,28 @@
+name: Range matched exits audit
+on:
+  push:
+    branches:
+      - experiment/range-matched-exits
+    paths:
+      - 'index.html'
+      - 'tests/range-matched-exits.test.cjs'
+      - '.github/workflows/range-matched-exits.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'tests/range-matched-exits.test.cjs'
+      - '.github/workflows/range-matched-exits.yml'
+permissions:
+  contents: read
+jobs:
+  deterministic-exit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify matched exit replay
+        run: node tests/range-matched-exits.test.cjs
