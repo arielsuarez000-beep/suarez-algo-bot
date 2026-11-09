@@ -1249,6 +1249,9 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
  function close(p,raw,why,bar,i){
   const sign=p.side==='LONG'?1:-1,exit=raw*(1-sign*rate),fees=(p.entry+exit)*p.qty*fee/100;
   const pnl=sign*(exit-p.entry)*p.qty-fees;balance+=pnl;draw(balance);
+  // Exit candle: only executed price is certain; high/low may be after exit.
+  p.maxFav=Math.max(p.maxFav||0,sign*(exit-p.entry),0);
+  p.maxAdv=Math.max(p.maxAdv||0,-sign*(exit-p.entry),0);
   trades.push({side:p.side,entry:p.entry,exit,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high,stop:p.stop,take:p.take,maxFav:p.maxFav||0,maxAdv:p.maxAdv||0,targetDistance:Math.abs(p.take-p.entry),stopDistance:Math.abs(p.entry-p.stop),durationBars:Math.round((bar.t-p.entryTime)/300000)+1});
   if(why==='SL'){
    stats.sl++;pendingBreakChecks.push({low:p.low,high:p.high,stopAt:bar.t,hours:0});
@@ -1296,6 +1299,10 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
      if(sl&&!newHourClose)stats.stopBeforeHourlyClose++;
      const gap=sl&&(long?bar.o<open.stop:bar.o>open.stop);
      close(open,sl?(gap?bar.o:open.stop):open.take,sl?'SL':'TP',bar,i);
+    }else{
+     // Candle completed with the position still open: both extremes occurred.
+     open.maxFav=Math.max(open.maxFav||0,long?bar.h-open.entry:open.entry-bar.l,0);
+     open.maxAdv=Math.max(open.maxAdv||0,long?open.entry-bar.l:bar.h-open.entry,0);
     }
    }
   }
@@ -1364,7 +1371,7 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
   if(used<1){stats.marginRejected++;blocked++;if(stats.examples.length<5)stats.examples.push({reason:'margen menor a 1 USDT',side:long?'LONG':'SHORT',rr,costMultiple,used});continue}
   stats.eligible++;
   const qty=used*leverage/entry;
-  open={side:long?'LONG':'SHORT',entry,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high};
+  open={side:long?'LONG':'SHORT',entry,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high,maxFav:0,maxAdv:0};
   rearmed=false;
   const sl=long?bar.l<=stop:bar.h>=stop,tp=long?bar.h>=take:bar.l<=take;
   if(sl||tp){
