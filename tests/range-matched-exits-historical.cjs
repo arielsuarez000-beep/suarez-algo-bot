@@ -1,7 +1,7 @@
 const fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 function fn(name){
- const start=html.indexOf('function '+name+'('); if(start<0) throw Error('Missing '+name);
+ const start=html.indexOf('function '+name+'('); if(start<0) throw Error('Missing '+name);\n if(name==='rangeMatchedExit'){const end=html.indexOf('\\nfunction rangeMatchedExitStats',start);if(end<0)throw Error('Missing rangeMatchedExitStats boundary');return html.slice(start,end);}
  let i=html.indexOf('{',start),depth=0,quote='',esc=false;
  for(;i<html.length;i++){const c=html[i];if(quote){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===quote)quote='';continue;}
  if(c==="'"||c==='"'||c==='`'){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return html.slice(start,i+1);}
