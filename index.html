@@ -1085,7 +1085,7 @@ function backtestRangePro(rows,options){
   if(used<1){stats.marginRejected++;blocked++;if(stats.examples.length<5)stats.examples.push({reason:'margen menor a 1 USDT',side:long?'LONG':'SHORT',rr,costMultiple,used});continue}
   stats.eligible++;
   const qty=used*leverage/entry;
-  open={side:long?'LONG':'SHORT',entry,stop,take,initialStop:stop,initialStopDistance:risk,protectionMode,qty,risk:risk*qty,entryTime:bar.t,low,high,maxFav:0,maxAdv:0};
+  open={side:long?'LONG':'SHORT',entry,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high,maxFav:0,maxAdv:0};
   rearmed=false;
   const sl=long?bar.l<=stop:bar.h>=stop,tp=long?bar.h>=take:bar.l<=take;
   if(sl||tp){
