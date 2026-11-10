@@ -1053,7 +1053,7 @@ function backtestRangePro(rows,options){
   const {low,high,width,mid}=currentZone;
   // Re-arm only after price has visibly returned to the middle of the range.
   if(last.c>=low+.38*width&&last.c<=low+.62*width)rearmed=true;
-  if(open||!rearmed||i-lastClose<=3||balance<=0||bar.t<entryStartTime)continue;
+  if(open||!rearmed||i-lastClose<=3||balance<=0)continue;
   const bullish=last.l<=low+.18*width&&last.c>=low+.08*width&&last.c<=low+.34*width&&last.c>last.o;
   const bearish=last.h>=high-.18*width&&last.c<=high-.08*width&&last.c>=high-.34*width&&last.c<last.o;
   if(!bullish&&!bearish)continue;
@@ -1310,7 +1310,7 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
   const {low,high,width,mid}=currentZone;
   // Re-arm only after price has visibly returned to the middle of the range.
   if(last.c>=low+.38*width&&last.c<=low+.62*width)rearmed=true;
-  if(open||!rearmed||i-lastClose<=3||balance<=0)continue;
+  if(open||!rearmed||i-lastClose<=3||balance<=0||bar.t<entryStartTime)continue;
   // On confirmation variant the rejection is TWO fully closed 5m candles back.
   // The next closed 5m candle must close beyond the rejecting candle's high/low.
   // Order is placed only at the opening of the following candle, without look-ahead.
