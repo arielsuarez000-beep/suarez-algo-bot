@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUAREZ FIBO PINBAR PRO · Backtest aislado</title>
+<style>
+:root{color-scheme:dark;--bg:#09111f;--panel:#111e31;--line:#263952;--txt:#eaf2ff;--muted:#9db0c9;--blue:#54a6ff;--green:#37d69a;--red:#ff7185;--gold:#ffc96b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#07101d,#0c1930);color:var(--txt);font:15px system-ui,Arial,sans-serif}main{max-width:1080px;margin:auto;padding:22px 15px 60px}h1{font-size:clamp(24px,5vw,36px);margin:8px 0}h2{font-size:18px;margin:0 0 14px}.sub,.muted,small{color:var(--muted)}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin:15px 0;box-shadow:0 12px 32px #0003}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:12px;color:var(--muted)}select,input{background:#091526;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:11px;font:inherit;width:100%}button,.btn{border:0;border-radius:10px;background:var(--blue);color:#04101f;font-weight:750;padding:12px 18px;font:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:wait}.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}.secondary{background:#263c58;color:var(--txt)}.notice{background:#0b1728;border:1px solid var(--line);padding:13px;border-radius:10px;color:var(--muted);line-height:1.5}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.stat{background:#0b1728;border:1px solid var(--line);padding:13px;border-radius:11px}.stat label{display:block;color:var(--muted);font-size:12px}.value{font-size:23px;font-weight:800;margin-top:5px;overflow-wrap:anywhere}.green{color:var(--green)}.red{color:var(--red)}.gold{color:var(--gold)}.scroll{overflow:auto}table{width:100%;border-collapse:collapse;min-width:680px}th,td{text-align:right;padding:9px;border-bottom:1px solid var(--line);font-size:13px}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600}.bar{height:8px;background:#263952;border-radius:9px;overflow:hidden;margin:10px 0}.bar span{display:block;height:100%;width:0;background:var(--blue)}a{color:#83beff}.tag{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:4px 9px;color:var(--muted);font-size:12px}#status{white-space:pre-wrap;min-height:55px}footer{color:var(--muted);font-size:12px;text-align:center;margin-top:25px}
+</style></head>
+<body><main>
+<a href="../" class="sub">← Volver a SUAREZ Algo Bot</a>
+<h1>SUAREZ FIBO PINBAR PRO</h1>
+<p class="sub">Laboratorio histórico independiente · Bybit público · Sin claves · Sin órdenes · No modifica Paper Trading</p>
+<div class="panel"><div class="tag">EXPERIMENTAL · NO OPERATIVO</div><h2 style="margin-top:12px">Configuración de la prueba</h2>
+<div class="grid">
+<div class="field"><label>Mercado</label><select id="symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option selected>SOLUSDT</option><option>BNBUSDT</option><option>XRPUSDT</option><option>DOGEUSDT</option><option>AVAXUSDT</option><option>LINKUSDT</option></select></div>
+<div class="field"><label>Temporalidad</label><select id="interval"><option value="5" selected>5 minutos</option><option value="15">15 minutos</option><option value="60">1 hora</option></select></div>
+<div class="field"><label>Histórico</label><select id="days"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></div>
+<div class="field"><label>Riesgo por operación</label><select id="risk"><option value="0.25">0,25%</option><option value="0.5" selected>0,50%</option><option value="0.75">0,75%</option><option value="1">1,00%</option></select></div>
+<div class="field"><label>Capital simulado (USDT)</label><input id="capital" type="number" min="100" max="1000000" step="100" value="1000"></div>
+<div class="field"><label>Comisión por lado</label><input id="fee" type="number" min="0" max="0.2" step="0.005" value="0.055"><small>En porcentaje</small></div>
+<div class="field"><label>Deslizamiento por lado</label><input id="slippage" type="number" min="0" max="0.5" step="0.005" value="0.02"><small>Supuesto en porcentaje</small></div>
+<div class="field"><label>Filtro ATR mínimo</label><input id="atrMin" type="number" min="0" max="5" step="0.05" value="0.15"><small>ATR como % del precio</small></div>
+</div>
+<div class="btnrow"><button id="run">▶ Ejecutar backtest</button><button id="cancel" class="secondary" disabled>Cancelar</button><button id="csv" class="secondary" disabled>Exportar operaciones CSV</button></div>
+<div class="bar"><span id="progress"></span></div><div id="status" class="notice" aria-live="polite">Preparado. Se descargarán velas cerradas desde Bybit. La consulta puede tardar si elegís 90 días.</div>
+</div>
+<div class="panel"><h2>Resultados cronológicos · 70% desarrollo / 30% prueba</h2><p class="muted">Los parámetros se mantienen iguales en ambos bloques. El tramo final se reserva como prueba temporal; no se usa para ajustar la estrategia.</p>
+<div class="grid"><div><div class="tag">PRIMER 70% · DESARROLLO</div><div id="train" class="stats" style="margin-top:10px"></div></div><div><div class="tag">ÚLTIMO 30% · PRUEBA</div><div id="test" class="stats" style="margin-top:10px"></div></div></div>
+<div id="verdict" class="notice" style="margin-top:14px">Todavía no hay resultados.</div></div>
+<div class="panel"><h2>Comparación de objetivos · 1,5R vs 2R</h2><div class="scroll"><table><thead><tr><th>Objetivo</th><th>Bloque</th><th>Operaciones</th><th>Acierto</th><th>Neto USDT</th><th>Profit Factor</th><th>DD máx.</th></tr></thead><tbody id="comparison"><tr><td colspan="7" style="text-align:left">Sin datos.</td></tr></tbody></table></div></div>
+<div class="panel"><h2>Últimas operaciones del tramo de prueba</h2><div class="scroll"><table><thead><tr><th>Fecha UTC</th><th>Lado</th><th>Entrada</th><th>Stop</th><th>Salida</th><th>Resultado neto</th><th>Motivo</th></tr></thead><tbody id="trades"><tr><td colspan="7" style="text-align:left">Sin operaciones.</td></tr></tbody></table></div></div>
+<div class="panel"><h2>Reglas y límites de esta simulación</h2><ul class="muted"><li>EMA 200 como filtro direccional; pivotes confirmados con 3 velas a cada lado.</li><li>Impulso confirmado y retroceso en zona Fibonacci 50%–61,8%; pinbar con mecha dominante y cierre hacia el extremo.</li><li>Entrada en apertura de la vela siguiente; stop detrás del extremo de la pinbar más 0,15 ATR.</li><li>Riesgo porcentual calculado por distancia al stop. Comisión y deslizamiento se aplican al entrar y salir.</li><li>Si stop y objetivo aparecen dentro de la misma vela, se cuenta primero el stop (criterio conservador).</li><li>No incluye financiación, spread variable, profundidad del libro, liquidaciones ni impacto de mercado. No equivale a resultados reales.</li><li>El 70/30 es una separación temporal, pero un histórico ya conocido no es una prueba futura genuina. Se requiere repetir en varios pares y períodos.</li></ul></div>
+<footer>SUAREZ Algo Bot · Módulo aislado de investigación · No envía órdenes a Bybit</footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);let controller=null,lastTrades=[];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function say(s){$('status').textContent=s}
+function fmt(n,d=2){return Number.isFinite(n)?n.toFixed(d):'—'}
+function ema(values,n){let out=Array(values.length).fill(null);if(values.length<n)return out;let e=values.slice(0,n).reduce((a,b)=>a+b,0)/n,k=2/(n+1);out[n-1]=e;for(let i=n;i<values.length;i++){e+=k*(values[i]-e);out[i]=e}return out}
+function atr(rows,n=14){let out=Array(rows.length).fill(null),trs=[];for(let i=0;i<rows.length;i++){let p=rows[i-1],r=rows[i];trs.push(i?Math.max(r.h-r.l,Math.abs(r.h-p.c),Math.abs(r.l-p.c)):r.h-r.l);if(i===n-1)out[i]=trs.slice(0,n).reduce((a,b)=>a+b,0)/n;else if(i>=n)out[i]=(out[i-1]*(n-1)+trs[i])/n}return out}
+async function fetchCandles(symbol,interval,days,signal){
+ const end=Date.now(),start=end-days*86400000,step=Number(interval)*60000,map=new Map();let cursor=end,pages=0;
+ while(cursor>start){if(signal.aborted)throw Error('Consulta cancelada');const url=new URL('https://api.bybit.com/v5/market/kline');url.search=new URLSearchParams({category:'linear',symbol,interval:String(interval),start:String(start),end:String(cursor),limit:'1000'});
+ const res=await fetch(url,{signal});if(!res.ok)throw Error('Bybit HTTP '+res.status);const data=await res.json();if(data.retCode!==0)throw Error('Bybit: '+data.retMsg);const list=data.result?.list||[];if(!list.length)break;let oldest=Infinity;for(const x of list){const t=Number(x[0]);oldest=Math.min(oldest,t);if(t>=start&&t+step<=end)map.set(t,{t,o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]})}if(oldest>=cursor)break;cursor=oldest-1;pages++;$('progress').style.width=Math.min(100,map.size/Math.ceil(days*1440/Number(interval))*100)+'%';say('Descargando '+symbol+' · página '+pages+' · '+map.size+' velas');if(list.length<2)break;await sleep(120);if(pages>80)throw Error('Se alcanzó el límite de páginas')}
+ const rows=[...map.values()].sort((a,b)=>a.t-b.t);if(rows.length<250)throw Error('Histórico insuficiente: '+rows.length+' velas. Probá otro período o temporalidad.');return rows
+}
+function pivotAt(rows,i,left=3,right=3){if(i<left||i+right>=rows.length)return null;let lo=true,hi=true;for(let j=i-left;j<=i+right;j++){if(j!==i){if(rows[j].l<=rows[i].l)lo=false;if(rows[j].h>=rows[i].h)hi=false}}return {low:lo?rows[i].l:null,high:hi?rows[i].h:null,confirmed:i+right}}
+function makeSignals(rows,atrMinPct){
+ const closes=rows.map(r=>r.c),e=ema(closes,200),a=atr(rows),pivots=[];let lastLow=null,lastHigh=null,signals=[];
+ for(let i=0;i<rows.length;i++){
+  const confirmIndex=i-3;if(confirmIndex>=3){const p=pivotAt(rows,confirmIndex,3,3);if(p){if(p.low)lastLow={price:p.low,index:confirmIndex,confirmed:i};if(p.high)lastHigh={price:p.high,index:confirmIndex,confirmed:i}}}
+  let r=rows[i],body=Math.max(Math.abs(r.c-r.o),r.c*0.00001),upper=r.h-Math.max(r.o,r.c),lower=Math.min(r.o,r.c)-r.l;
+  let atrPct=a[i]/r.c*100;if(!e[i]||!a[i]||atrPct<atrMinPct||i+1>=rows.length){signals.push(null);continue}
+  let bull=null,bear=null;
+  if(lastLow&&lastHigh&&lastLow.index<lastHigh.index&&i>lastHigh.index){
+   let lo=lastLow.price,hi=lastHigh.price,span=hi-lo,z1=hi-span*.618,z2=hi-span*.5;
+   let inZone=r.l<=z2&&r.c>=z1&&r.c<=hi;
+   let pin=lower>=body*2&&upper<=body*1.2&&r.c>r.o&&(r.h-r.c)<=Math.max(body, a[i]*.25);
+   if(span>0&&inZone&&pin&&r.c>e[i])bull='LONG';
+  }
+  if(lastHigh&&lastLow&&lastHigh.index<lastLow.index&&i>lastLow.index){
+   let hi=lastHigh.price,lo=lastLow.price,span=hi-lo,z1=lo+span*.5,z2=lo+span*.618;
+   let inZone=r.h>=z1&&r.c<=z2&&r.c>=lo;
+   let pin=upper>=body*2&&lower<=body*1.2&&r.c<r.o&&(r.c-r.l)<=Math.max(body,a[i]*.25);
+   if(span>0&&inZone&&pin&&r.c<e[i])bear='SHORT';
+  }
+  signals.push(bull||bear?{side:bull||bear,atr:a[i]}:null)
+ }
+ return signals
+}
+function simulate(rows,signals,target,settings,from,to){
+ let equity=settings.capital,peak=equity,maxDD=0,closed=[],pos=null,skipUntil=from;
+ for(let i=Math.max(from,200);i<to-1;i++){
+  const r=rows[i];
+  if(pos){
+   let stopHit=pos.side==='LONG'?r.l<=pos.stop:r.h>=pos.stop;
+   let tpHit=pos.side==='LONG'?r.h>=pos.target:r.l<=pos.target;
+   if(stopHit||tpHit){let reason=stopHit?'STOP':'TARGET',raw=stopHit?pos.stop:pos.target,slip=settings.slip/10000,exit=pos.side==='LONG'?raw*(1-(stopHit?slip:-slip)):raw*(1+(stopHit?slip:-slip));
+    const gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty;
+    const fees=(pos.entry+exit)*pos.qty*settings.fee/10000,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);
+    closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason,equity});pos=null;skipUntil=i+1;
+   }
+  }
+  if(!pos&&i>=skipUntil&&signals[i]){
+   const s=signals[i],next=rows[i+1],side=s.side,slip=settings.slip/10000,entry=side==='LONG'?next.o*(1+slip):next.o*(1-slip);
+   const stop=side==='LONG'?r.l-s.atr*.15:r.h+s.atr*.15,riskDist=Math.abs(entry-stop);if(riskDist<=0||!Number.isFinite(riskDist))continue;
+   const riskCash=equity*settings.risk/100,qty=riskCash/riskDist,goal=side==='LONG'?entry+riskDist*target:entry-riskDist*target;
+   pos={side,entry,stop,target:goal,qty};
+  }
+ }
+ if(pos){const r=rows[to-1],raw=r.c,slip=settings.slip/10000,exit=pos.side==='LONG'?raw*(1-slip):raw*(1+slip),gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty,fees=(pos.entry+exit)*pos.qty*settings.fee/10000,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason:'CIERRE FIN',equity})}
+ return metrics(closed,settings.capital,maxDD)
+}
+function metrics(trades,capital,dd){let wins=trades.filter(x=>x.net>0),loss=trades.filter(x=>x.net<0),grossWin=wins.reduce((s,x)=>s+x.net,0),grossLoss=-loss.reduce((s,x)=>s+x.net,0),net=trades.reduce((s,x)=>s+x.net,0);return {trades,wins:wins.length,winrate:trades.length?wins.length/trades.length*100:0,net,pf:grossLoss?grossWin/grossLoss:grossWin?Infinity:0,dd,final:capital+net}}
+function renderStats(id,m){$(id).innerHTML=[['Operaciones',m.trades.length],['Acierto',fmt(m.winrate,1)+'%'],['Neto',fmt(m.net)+' USDT'],['Profit Factor',m.pf===Infinity?'∞':fmt(m.pf,2)],['Drawdown máx.',fmt(m.dd,2)+'%'],['Capital final',fmt(m.final)+' USDT']].map(([k,v])=>'<div class="stat"><label>'+k+'</label><div class="value '+(k==='Neto'?(m.net>=0?'green':'red'):'')+'">'+v+'</div></div>').join('')}
+function runAll(rows,settings,split){let sig=makeSignals(rows,settings.atrMin);let result=[];for(const target of [1.5,2]){result.push({target,train:simulate(rows,sig,target,settings,200,split),test:simulate(rows,sig,target,settings,Math.max(200,split-200),rows.length)})}return result}
+function render(res,split,rows){const best=res.find(x=>x.target===1.5);renderStats('train',best.train);renderStats('test',best.test);let lines=[];for(const x of res){for(const [name,m] of [['70%',x.train],['30%',x.test]])lines.push('<tr><td>'+x.target+'R</td><td>'+name+'</td><td>'+m.trades.length+'</td><td>'+fmt(m.winrate,1)+'%</td><td class="'+(m.net>=0?'green':'red')+'">'+fmt(m.net)+'</td><td>'+(m.pf===Infinity?'∞':fmt(m.pf,2))+'</td><td>'+fmt(m.dd,2)+'%</td></tr>')}$('comparison').innerHTML=lines.join('');
+ const t=res.find(x=>x.target===1.5).test.trades;lastTrades=t;$('csv').disabled=!t.length;$('trades').innerHTML=t.slice(-30).reverse().map(x=>'<tr><td>'+new Date(x.time).toISOString().replace('T',' ').slice(0,19)+'</td><td>'+x.side+'</td><td>'+fmt(x.entry,5)+'</td><td>'+fmt(x.stop,5)+'</td><td>'+fmt(x.exit,5)+'</td><td class="'+(x.net>=0?'green':'red')+'">'+fmt(x.net,3)+'</td><td>'+x.reason+'</td></tr>').join('')||'<tr><td colspan="7">No hubo operaciones en el bloque de prueba.</td></tr>';
+ let m=best.test,verdict='Resultado exploratorio. ';if(m.trades.length<30)verdict+='Hay menos de 30 operaciones en el tramo de prueba: muestra insuficiente.';else if(m.net>0&&m.pf>1.2&&m.dd<15)verdict+='Señal inicial para seguir investigando; todavía requiere validación en otros pares, temporalidades y datos no vistos.';else verdict+='No supera los criterios iniciales de seguimiento. No se recomienda operar dinero real.';$('verdict').textContent=verdict+' Este test no garantiza rentabilidad ni sustituye una simulación de ejecución real.'}
+$('run').onclick=async()=>{if(controller)return;controller=new AbortController();$('run').disabled=true;$('cancel').disabled=false;$('csv').disabled=true;$('progress').style.width='0%';$('train').innerHTML='';$('test').innerHTML='';$('comparison').innerHTML='';$('trades').innerHTML='';try{let settings={capital:Number($('capital').value),risk:Number($('risk').value),fee:Number($('fee').value),slip:Number($('slippage').value),atrMin:Number($('atrMin').value)};if(!(settings.capital>=100)||settings.fee<0||settings.slip<0)throw Error('Revisá capital, comisión y deslizamiento.');let days=Number($('days').value),interval=$('interval').value,symbol=$('symbol').value;let rows=await fetchCandles(symbol,interval,days,controller.signal);say('Calculando EMA200, ATR, pivotes, Fibonacci y pinbars sobre '+rows.length+' velas…');let split=Math.floor(rows.length*.7);if(split<250)throw Error('No hay suficientes velas para separar el 70/30 y calcular EMA200.');let results=runAll(rows,settings,split);render(results,split,rows);$('progress').style.width='100%';say('Prueba terminada · '+symbol+' · '+interval+'m · '+rows.length+' velas. Revisá especialmente el bloque 30%.');}catch(e){say('No se pudo completar: '+(e.message||e));}finally{controller=null;$('run').disabled=false;$('cancel').disabled=true}};
+$('cancel').onclick=()=>{if(controller)controller.abort()};$('csv').onclick=()=>{let header='fecha_utc,lado,entrada,stop,salida,neto_usdt,comisiones,motivo';let rows=lastTrades.map(t=>[new Date(t.time).toISOString(),t.side,t.entry,t.stop,t.exit,t.net,t.fees,t.reason].join(','));let blob=new Blob([header+'\n'+rows.join('\n')],{type:'text/csv'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='suarez-fibo-pinbar-backtest.csv';a.click();URL.revokeObjectURL(url)};
+</script></body></html>
