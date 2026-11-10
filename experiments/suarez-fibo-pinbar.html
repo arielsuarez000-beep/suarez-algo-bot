@@ -16,11 +16,11 @@
 <div class="field"><label>Mercado</label><select id="symbol"><option>BTCUSDT</option><option>ETHUSDT</option><option selected>SOLUSDT</option><option>BNBUSDT</option><option>XRPUSDT</option><option>DOGEUSDT</option><option>AVAXUSDT</option><option>LINKUSDT</option></select></div>
 <div class="field"><label>Temporalidad</label><select id="interval"><option value="5" selected>5 minutos</option><option value="15">15 minutos</option><option value="60">1 hora</option></select></div>
 <div class="field"><label>Histórico</label><select id="days"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option></select></div>
-<div class="field"><label>Riesgo por operación</label><select id="risk"><option value="0.25">0,25%</option><option value="0.5" selected>0,50%</option><option value="0.75">0,75%</option><option value="1">1,00%</option></select></div>
+<div class="field"><label>Riesgo por operación</label><div class="notice">0,50% del equity · fijo como en Pine Script</div></div>
 <div class="field"><label>Capital simulado (USDT)</label><input id="capital" type="number" min="100" max="1000000" step="100" value="1000"></div>
 <div class="field"><label>Comisión por lado</label><input id="fee" type="number" min="0" max="0.2" step="0.005" value="0.055"><small>En porcentaje</small></div>
-<div class="field"><label>Deslizamiento por lado</label><input id="slippage" type="number" min="0" max="0.5" step="0.005" value="0.02"><small>Supuesto en porcentaje</small></div>
-<div class="field"><label>Filtro ATR mínimo</label><input id="atrMin" type="number" min="0" max="5" step="0.05" value="0.15"><small>ATR como % del precio</small></div>
+<div class="field"><label>Deslizamiento</label><div class="notice">2 ticks de Bybit · tick size consultado automáticamente</div></div>
+<div class="field"><label>Filtro ATR mínimo</label><div class="notice">0,10% del precio · fijo como en Pine Script</div></div>
 </div>
 <div class="btnrow"><button id="run">▶ Ejecutar backtest</button><button id="cancel" class="secondary" disabled>Cancelar</button><button id="csv" class="secondary" disabled>Exportar operaciones CSV</button></div>
 <div class="bar"><span id="progress"></span></div><div id="status" class="notice" aria-live="polite">Preparado. Se descargarán velas cerradas desde Bybit. La consulta puede tardar si elegís 90 días.</div>
@@ -66,7 +66,7 @@ function simulate(rows,signals,target,settings,from,to){
  let equity=settings.capital,peak=equity,maxDD=0,closed=[],pos=null,skipUntil=from;const slip=settings.slipTicks*settings.tickSize;
  for(let i=Math.max(from,200);i<to-1;i++){const r=rows[i];
   if(pos){const sh=pos.side==='LONG'?r.l<=pos.stop:r.h>=pos.stop,th=pos.side==='LONG'?r.h>=pos.target:r.l<=pos.target;if(sh||th){const reason=sh?'STOP':'TARGET',raw=sh?pos.stop:pos.target,exit=sh?(pos.side==='LONG'?raw-slip:raw+slip):raw,gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty,fees=(pos.entry+exit)*pos.qty*settings.fee/100,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason,equity});pos=null;skipUntil=i+1}}
-  if(!pos&&i>=skipUntil&&signals[i]){const sig=signals[i],next=rows[i+1],side=sig.side,entry=side==='LONG'?next.o+slip:next.o-slip,stop=side==='LONG'?r.l-sig.atr*.20:r.h+sig.atr*.20,dist=side==='LONG'?entry-stop:stop-entry;if(!(dist>settings.tickSize&&dist<=sig.atr*3))continue;const qty=(equity*.50/100)/dist,goal=side==='LONG'?entry+dist*target:entry-dist*target;pos={side,entry,stop,target:goal,qty}}
+  if(!pos&&i>=skipUntil&&signals[i]){const sig=signals[i],next=rows[i+1],side=sig.side,entry=side==='LONG'?next.o+slip:next.o-slip,stop=side==='LONG'?r.l-sig.atr*.20:r.h+sig.atr*.20,sizingDist=side==='LONG'?r.c-stop:stop-r.c,dist=side==='LONG'?entry-stop:stop-entry;if(!(sizingDist>settings.tickSize&&sizingDist<=sig.atr*3&&dist>0))continue;const qty=(equity*.50/100)/sizingDist,goal=side==='LONG'?entry+dist*target:entry-dist*target;pos={side,entry,stop,target:goal,qty}}
  }
  if(pos){const r=rows[to-1],exit=pos.side==='LONG'?r.c-slip:r.c+slip,gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty,fees=(pos.entry+exit)*pos.qty*settings.fee/100,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason:'CIERRE FIN',equity})}
  return metrics(closed,settings.capital,maxDD)
