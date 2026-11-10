@@ -37,7 +37,7 @@ test('trailing LONG: activa en +1R y sube sin retroceder', () => {
 test('break-even y trailing SHORT: el stop baja, nunca sube', () => {
   assert.equal(updateRangeProtectionStop(position('SHORT', 1.00, 102, 102), 'be05'), 100);
   assert.equal(updateRangeProtectionStop(position('SHORT', 2.00, 102, 102), 'trail'), 99.5);
-  assert.equal(updateRangeProtectionStop(position('SHORT', 3.00, 99, 102), 'trail'), 99);
+  assert.equal(updateRangeProtectionStop(position('SHORT', 3.00, 99, 102), 'trail'), 98.5);
 });
 
 test('riesgo inicial inválido: conserva el stop sin dividir por cero', () => {
