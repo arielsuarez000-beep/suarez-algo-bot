@@ -1,0 +1,35 @@
+name: Validate isolated R protection lab
+on:
+  push:
+    branches:
+      - lab/proteccion-r-aislada
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check inline JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { spawnSync } = require('node:child_process');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          if (!scripts.length) throw new Error('No inline scripts found');
+          scripts.forEach((m, i) => {
+            const path = `/tmp/suarez-inline-${i}.js`;
+            fs.writeFileSync(path, m[1]);
+            const result = spawnSync('node', ['--check', path], { encoding: 'utf8' });
+            if (result.status !== 0) {
+              process.stderr.write(result.stderr);
+              process.exit(result.status || 1);
+            }
+          });
+          console.log(`Syntax OK: ${scripts.length} inline script(s)`);
+          NODE
+      - name: Test R protection thresholds and monotonic stops
+        run: node --test tests/protection-stop.test.cjs
