@@ -1053,6 +1053,8 @@ function backtestRangePro(rows,options){
   const {low,high,width,mid}=currentZone;
   // Re-arm only after price has visibly returned to the middle of the range.
   if(last.c>=low+.38*width&&last.c<=low+.62*width)rearmed=true;
+  // Warm-up candles establish hourly zones but cannot create trades in the evaluation block.
+  if(bar.t<tradingStartTime)continue;
   if(open||!rearmed||i-lastClose<=3||balance<=0)continue;
   const bullish=last.l<=low+.18*width&&last.c>=low+.08*width&&last.c<=low+.34*width&&last.c>last.o;
   const bearish=last.h>=high-.18*width&&last.c<=high-.08*width&&last.c>=high-.34*width&&last.c<last.o;
@@ -1238,7 +1240,7 @@ function rangeFindZone1h(closed60,requireSideways=false){
  return {low,high,width,mid,end:closed60.at(-1).end};
 }
 
-function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false,protectRange=false,sidewaysOnly=false,centerProgress=false,protectionMode='none'){
+function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false,protectRange=false,sidewaysOnly=false,centerProgress=false,protectionMode='none',tradingStartTime=0){
  const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed60=rangeAggregate1h(rows);
  let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
  const stats={lowRange:0,noZone:0,weakReward:0,rangeBroken:0,sl:0,tp:0,invalid:0,invalidRisk:0,noReward:0,rrRejected:0,costRejected:0,marginRejected:0,eligible:0,guardRejected:0,guardTrend:0,guardImpulse:0,guardWick:0,sidewaysRejected:0,hourlyBreaks:0,hourlyBreaksWhileOpen:0,hourlyBreaksWhileFlat:0,stopBeforeHourlyClose:0,stopsLaterHourlyBreak:0,stopsWithoutHourlyBreak:0,rrSamples:[],costSamples:[],marginSamples:[],examples:[]};
@@ -1902,7 +1904,7 @@ async function runRangeProtectionAudit(){
     for(const period of periods){
      const comparisons=[];
      for(const mode of modes){
-      const r=backtestRangeHourly(period.data,settings,.06,false,false,false,false,mode.id);
+      const r=backtestRangeHourly(period.data,settings,.06,false,false,false,false,mode.id,period.filter?start:0);
       const trades=period.filter?r.trades.filter(t=>t.entryTime>=start):r.trades;
       const wins=trades.filter(t=>t.pnl>0).length,loss=trades.filter(t=>t.pnl<0).reduce((a,t)=>a-t.pnl,0),profit=trades.filter(t=>t.pnl>0).reduce((a,t)=>a+t.pnl,0);
       comparisons.push({name:mode.name,id:mode.id,n:trades.length,net:trades.reduce((a,t)=>a+t.pnl,0),wins,losses:trades.length-wins,sl:trades.filter(t=>t.reason==='SL').length,tp:trades.filter(t=>t.reason==='TP').length,pf:loss>0?profit/loss:null,dd:r.maxDD});
