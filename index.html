@@ -1240,6 +1240,20 @@ function rangeFindZone1h(closed60,requireSideways=false){
  return {low,high,width,mid,end:closed60.at(-1).end};
 }
 
+function updateRangeProtectionStop(position,mode){
+ const long=position.side==='LONG';
+ const initialR=position.initialStopDistance||Math.abs(position.entry-position.initialStop);
+ if(!(initialR>0))return position.stop;
+ const favorableR=(position.maxFav||0)/initialR;
+ if(mode==='be05'&&favorableR>=.5)return long?Math.max(position.stop,position.entry):Math.min(position.stop,position.entry);
+ if(mode==='be075'&&favorableR>=.75)return long?Math.max(position.stop,position.entry):Math.min(position.stop,position.entry);
+ if(mode==='trail'&&favorableR>=1){
+  const locked=(position.maxFav||0)-.75*initialR;
+  const nextStop=long?position.entry+locked:position.entry-locked;
+  return long?Math.max(position.stop,nextStop):Math.min(position.stop,nextStop);
+ }
+ return position.stop;
+}
 function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false,protectRange=false,sidewaysOnly=false,centerProgress=false,protectionMode='none',tradingStartTime=0){
  const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed60=rangeAggregate1h(rows);
  let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
@@ -1305,12 +1319,8 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
      // Candle completed with the position still open: both extremes occurred.
      open.maxFav=Math.max(open.maxFav||0,long?bar.h-open.entry:open.entry-bar.l,0);
      open.maxAdv=Math.max(open.maxAdv||0,long?open.entry-bar.l:bar.h-open.entry,0);
-     // Protection is calculated only after this candle closes and becomes active on the NEXT candle.
-     const initialR=open.initialStopDistance||Math.abs(open.entry-open.initialStop);
-     const favorableR=initialR>0?(open.maxFav||0)/initialR:0;
-     if(protectionMode==='be05'&&favorableR>=0.5)open.stop=long?Math.max(open.stop,open.entry):Math.min(open.stop,open.entry);
-     if(protectionMode==='be075'&&favorableR>=0.75)open.stop=long?Math.max(open.stop,open.entry):Math.min(open.stop,open.entry);
-     if(protectionMode==='trail'&&favorableR>=1){const locked=(open.maxFav||0)-0.75*initialR;const nextStop=long?open.entry+locked:open.entry-locked;open.stop=long?Math.max(open.stop,nextStop):Math.min(open.stop,nextStop)}
+     // Protection is calculated after candle close and applies from the NEXT candle.
+     open.stop=updateRangeProtectionStop(open,protectionMode)
     }
    }
   }
