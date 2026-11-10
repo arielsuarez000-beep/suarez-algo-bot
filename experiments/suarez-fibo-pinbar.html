@@ -47,59 +47,36 @@ async function fetchCandles(symbol,interval,days,signal){
  const res=await fetch(url,{signal});if(!res.ok)throw Error('Bybit HTTP '+res.status);const data=await res.json();if(data.retCode!==0)throw Error('Bybit: '+data.retMsg);const list=data.result?.list||[];if(!list.length)break;let oldest=Infinity;for(const x of list){const t=Number(x[0]);oldest=Math.min(oldest,t);if(t>=start&&t+step<=end)map.set(t,{t,o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]})}if(oldest>=cursor)break;cursor=oldest-1;pages++;$('progress').style.width=Math.min(100,map.size/Math.ceil(days*1440/Number(interval))*100)+'%';say('Descargando '+symbol+' · página '+pages+' · '+map.size+' velas');if(list.length<2)break;await sleep(120);if(pages>80)throw Error('Se alcanzó el límite de páginas')}
  const rows=[...map.values()].sort((a,b)=>a.t-b.t);if(rows.length<250)throw Error('Histórico insuficiente: '+rows.length+' velas. Probá otro período o temporalidad.');return rows
 }
-function pivotAt(rows,i,left=3,right=3){if(i<left||i+right>=rows.length)return null;let lo=true,hi=true;for(let j=i-left;j<=i+right;j++){if(j!==i){if(rows[j].l<=rows[i].l)lo=false;if(rows[j].h>=rows[i].h)hi=false}}return {low:lo?rows[i].l:null,high:hi?rows[i].h:null,confirmed:i+right}}
-function makeSignals(rows,atrMinPct){
- const closes=rows.map(r=>r.c),e=ema(closes,200),a=atr(rows),pivots=[];let lastLow=null,lastHigh=null,signals=[];
+function pivotAt(rows,i,left=10,right=10){if(i<left||i+right>=rows.length)return null;let lo=true,hi=true;for(let j=i-left;j<=i+right;j++){if(j!==i){if(rows[j].l<=rows[i].l)lo=false;if(rows[j].h>=rows[i].h)hi=false}}return {low:lo?rows[i].l:null,high:hi?rows[i].h:null,confirmed:i+right}}
+function makeSignals(rows,settings){
+ const closes=rows.map(r=>r.c),e=ema(closes,200),a=atr(rows,14),signals=[];let lastLow=null,lastHigh=null;const pivotLen=10,tick=settings.tickSize;
  for(let i=0;i<rows.length;i++){
-  const confirmIndex=i-3;if(confirmIndex>=3){const p=pivotAt(rows,confirmIndex,3,3);if(p){if(p.low)lastLow={price:p.low,index:confirmIndex,confirmed:i};if(p.high)lastHigh={price:p.high,index:confirmIndex,confirmed:i}}}
-  let r=rows[i],body=Math.max(Math.abs(r.c-r.o),r.c*0.00001),upper=r.h-Math.max(r.o,r.c),lower=Math.min(r.o,r.c)-r.l;
-  let atrPct=a[i]/r.c*100;if(!e[i]||!a[i]||atrPct<atrMinPct||i+1>=rows.length){signals.push(null);continue}
-  let bull=null,bear=null;
-  if(lastLow&&lastHigh&&lastLow.index<lastHigh.index&&i>lastHigh.index){
-   let lo=lastLow.price,hi=lastHigh.price,span=hi-lo,z1=hi-span*.618,z2=hi-span*.5;
-   let inZone=r.l<=z2&&r.c>=z1&&r.c<=hi;
-   let pin=lower>=body*2&&upper<=body*1.2&&r.c>r.o&&(r.h-r.c)<=Math.max(body, a[i]*.25);
-   if(span>0&&inZone&&pin&&r.c>e[i])bull='LONG';
-  }
-  if(lastHigh&&lastLow&&lastHigh.index<lastLow.index&&i>lastLow.index){
-   let hi=lastHigh.price,lo=lastLow.price,span=hi-lo,z1=lo+span*.5,z2=lo+span*.618;
-   let inZone=r.h>=z1&&r.c<=z2&&r.c>=lo;
-   let pin=upper>=body*2&&lower<=body*1.2&&r.c<r.o&&(r.c-r.l)<=Math.max(body,a[i]*.25);
-   if(span>0&&inZone&&pin&&r.c<e[i])bear='SHORT';
-  }
-  signals.push(bull||bear?{side:bull||bear,atr:a[i]}:null)
- }
- return signals
+  const center=i-pivotLen;if(center>=pivotLen){const p=pivotAt(rows,center,pivotLen,pivotLen);if(p){if(p.low!==null)lastLow={price:p.low,index:center};if(p.high!==null)lastHigh={price:p.high,index:center}}}
+  const r=rows[i],body=Math.max(Math.abs(r.c-r.o),tick),range=Math.max(r.h-r.l,tick),lower=Math.min(r.o,r.c)-r.l,upper=r.h-Math.max(r.o,r.c),atrPct=a[i]&&r.c?a[i]/r.c*100:0;
+  if(!e[i]||!a[i]||atrPct<settings.atrMin||i+1>=rows.length){signals.push(null);continue}
+  const vb=lastLow&&lastHigh&&lastLow.index<lastHigh.index&&lastHigh.price>lastLow.price,vs=lastLow&&lastHigh&&lastHigh.index<lastLow.index&&lastHigh.price>lastLow.price;
+  const rb=vb?lastHigh.price-lastLow.price:0,rs=vs?lastHigh.price-lastLow.price:0;
+  const bz=vb&&rb<=a[i]*30&&r.c>=lastHigh.price-rb*.618&&r.c<=lastHigh.price-rb*.50,sz=vs&&rs<=a[i]*30&&r.c>=lastLow.price+rs*.50&&r.c<=lastLow.price+rs*.618;
+  const bp=r.c>r.o&&lower>=body*2&&upper<=body*.8&&(r.h-r.c)/range<=.30,sp=r.c<r.o&&upper>=body*2&&lower<=body*.8&&(r.c-r.l)/range<=.30;
+  const tl=r.c>e[i]&&(!settings.useSlope||e[i]>e[i-1]),ts=r.c<e[i]&&(!settings.useSlope||e[i]<e[i-1]);
+  signals.push(settings.allowLong&&tl&&bz&&bp?{side:'LONG',atr:a[i]}:settings.allowShort&&ts&&sz&&sp?{side:'SHORT',atr:a[i]}:null);
+ }return signals
 }
 function simulate(rows,signals,target,settings,from,to){
- let equity=settings.capital,peak=equity,maxDD=0,closed=[],pos=null,skipUntil=from;
- for(let i=Math.max(from,200);i<to-1;i++){
-  const r=rows[i];
-  if(pos){
-   let stopHit=pos.side==='LONG'?r.l<=pos.stop:r.h>=pos.stop;
-   let tpHit=pos.side==='LONG'?r.h>=pos.target:r.l<=pos.target;
-   if(stopHit||tpHit){let reason=stopHit?'STOP':'TARGET',raw=stopHit?pos.stop:pos.target,slip=settings.slip/10000,exit=pos.side==='LONG'?raw*(1-slip):raw*(1+slip);
-    const gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty;
-    const fees=(pos.entry+exit)*pos.qty*settings.fee/100,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);
-    closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason,equity});pos=null;skipUntil=i+1;
-   }
-  }
-  if(!pos&&i>=skipUntil&&signals[i]){
-   const s=signals[i],next=rows[i+1],side=s.side,slip=settings.slip/10000,entry=side==='LONG'?next.o*(1+slip):next.o*(1-slip);
-   const stop=side==='LONG'?r.l-s.atr*.15:r.h+s.atr*.15,riskDist=Math.abs(entry-stop);if(riskDist<=0||!Number.isFinite(riskDist))continue;
-   const riskCash=equity*settings.risk/100,qty=riskCash/riskDist,goal=side==='LONG'?entry+riskDist*target:entry-riskDist*target;
-   pos={side,entry,stop,target:goal,qty};
-  }
+ let equity=settings.capital,peak=equity,maxDD=0,closed=[],pos=null,skipUntil=from;const slip=settings.slipTicks*settings.tickSize;
+ for(let i=Math.max(from,200);i<to-1;i++){const r=rows[i];
+  if(pos){const sh=pos.side==='LONG'?r.l<=pos.stop:r.h>=pos.stop,th=pos.side==='LONG'?r.h>=pos.target:r.l<=pos.target;if(sh||th){const reason=sh?'STOP':'TARGET',raw=sh?pos.stop:pos.target,exit=sh?(pos.side==='LONG'?raw-slip:raw+slip):raw,gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty,fees=(pos.entry+exit)*pos.qty*settings.fee/100,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason,equity});pos=null;skipUntil=i+1}}
+  if(!pos&&i>=skipUntil&&signals[i]){const sig=signals[i],next=rows[i+1],side=sig.side,entry=side==='LONG'?next.o+slip:next.o-slip,stop=side==='LONG'?r.l-sig.atr*.20:r.h+sig.atr*.20,dist=side==='LONG'?entry-stop:stop-entry;if(!(dist>settings.tickSize&&dist<=sig.atr*3))continue;const qty=(equity*.50/100)/dist,goal=side==='LONG'?entry+dist*target:entry-dist*target;pos={side,entry,stop,target:goal,qty}}
  }
- if(pos){const r=rows[to-1],raw=r.c,slip=settings.slip/10000,exit=pos.side==='LONG'?raw*(1-slip):raw*(1+slip),gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty,fees=(pos.entry+exit)*pos.qty*settings.fee/100,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason:'CIERRE FIN',equity})}
+ if(pos){const r=rows[to-1],exit=pos.side==='LONG'?r.c-slip:r.c+slip,gross=(pos.side==='LONG'?exit-pos.entry:pos.entry-exit)*pos.qty,fees=(pos.entry+exit)*pos.qty*settings.fee/100,net=gross-fees;equity+=net;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);closed.push({time:r.t,side:pos.side,entry:pos.entry,stop:pos.stop,exit,net,fees,reason:'CIERRE FIN',equity})}
  return metrics(closed,settings.capital,maxDD)
 }
 function metrics(trades,capital,dd){let wins=trades.filter(x=>x.net>0),loss=trades.filter(x=>x.net<0),grossWin=wins.reduce((s,x)=>s+x.net,0),grossLoss=-loss.reduce((s,x)=>s+x.net,0),net=trades.reduce((s,x)=>s+x.net,0);return {trades,wins:wins.length,winrate:trades.length?wins.length/trades.length*100:0,net,pf:grossLoss?grossWin/grossLoss:grossWin?Infinity:0,dd,final:capital+net}}
 function renderStats(id,m){$(id).innerHTML=[['Operaciones',m.trades.length],['Acierto',fmt(m.winrate,1)+'%'],['Neto',fmt(m.net)+' USDT'],['Profit Factor',m.pf===Infinity?'∞':fmt(m.pf,2)],['Drawdown máx.',fmt(m.dd,2)+'%'],['Capital final',fmt(m.final)+' USDT']].map(([k,v])=>'<div class="stat"><label>'+k+'</label><div class="value '+(k==='Neto'?(m.net>=0?'green':'red'):'')+'">'+v+'</div></div>').join('')}
-function runAll(rows,settings,split){let sig=makeSignals(rows,settings.atrMin);let result=[];for(const target of [1.5,2]){result.push({target,train:simulate(rows,sig,target,settings,200,split),test:simulate(rows,sig,target,settings,split,rows.length)})}return result}
+function runAll(rows,settings,split){let sig=makeSignals(rows,settings);let result=[];for(const target of [1.5,2]){result.push({target,train:simulate(rows,sig,target,settings,200,split),test:simulate(rows,sig,target,settings,split,rows.length)})}return result}
 function render(res,split,rows){const best=res.find(x=>x.target===1.5);renderStats('train',best.train);renderStats('test',best.test);let lines=[];for(const x of res){for(const [name,m] of [['70%',x.train],['30%',x.test]])lines.push('<tr><td>'+x.target+'R</td><td>'+name+'</td><td>'+m.trades.length+'</td><td>'+fmt(m.winrate,1)+'%</td><td class="'+(m.net>=0?'green':'red')+'">'+fmt(m.net)+'</td><td>'+(m.pf===Infinity?'∞':fmt(m.pf,2))+'</td><td>'+fmt(m.dd,2)+'%</td></tr>')}$('comparison').innerHTML=lines.join('');
  const t=res.find(x=>x.target===1.5).test.trades;lastTrades=t;$('csv').disabled=!t.length;$('trades').innerHTML=t.slice(-30).reverse().map(x=>'<tr><td>'+new Date(x.time).toISOString().replace('T',' ').slice(0,19)+'</td><td>'+x.side+'</td><td>'+fmt(x.entry,5)+'</td><td>'+fmt(x.stop,5)+'</td><td>'+fmt(x.exit,5)+'</td><td class="'+(x.net>=0?'green':'red')+'">'+fmt(x.net,3)+'</td><td>'+x.reason+'</td></tr>').join('')||'<tr><td colspan="7">No hubo operaciones en el bloque de prueba.</td></tr>';
  let m=best.test,verdict='Resultado exploratorio. ';if(m.trades.length<30)verdict+='Hay menos de 30 operaciones en el tramo de prueba: muestra insuficiente.';else if(m.net>0&&m.pf>1.2&&m.dd<15)verdict+='Señal inicial para seguir investigando; todavía requiere validación en otros pares, temporalidades y datos no vistos.';else verdict+='No supera los criterios iniciales de seguimiento. No se recomienda operar dinero real.';$('verdict').textContent=verdict+' Este test no garantiza rentabilidad ni sustituye una simulación de ejecución real.'}
-$('run').onclick=async()=>{if(controller)return;controller=new AbortController();$('run').disabled=true;$('cancel').disabled=false;$('csv').disabled=true;$('progress').style.width='0%';$('train').innerHTML='';$('test').innerHTML='';$('comparison').innerHTML='';$('trades').innerHTML='';try{let settings={capital:Number($('capital').value),risk:Number($('risk').value),fee:Number($('fee').value),slip:Number($('slippage').value),atrMin:Number($('atrMin').value)};if(!(settings.capital>=100)||settings.fee<0||settings.slip<0)throw Error('Revisá capital, comisión y deslizamiento.');let days=Number($('days').value),interval=$('interval').value,symbol=$('symbol').value;let rows=await fetchCandles(symbol,interval,days,controller.signal);say('Calculando EMA200, ATR, pivotes, Fibonacci y pinbars sobre '+rows.length+' velas…');let split=Math.floor(rows.length*.7);if(split<250)throw Error('No hay suficientes velas para separar el 70/30 y calcular EMA200.');let results=runAll(rows,settings,split);render(results,split,rows);$('progress').style.width='100%';say('Prueba terminada · '+symbol+' · '+interval+'m · '+rows.length+' velas. Revisá especialmente el bloque 30%.');}catch(e){say('No se pudo completar: '+(e.message||e));}finally{controller=null;$('run').disabled=false;$('cancel').disabled=true}};
+$('run').onclick=async()=>{if(controller)return;controller=new AbortController();$('run').disabled=true;$('cancel').disabled=false;$('csv').disabled=true;$('progress').style.width='0%';$('train').innerHTML='';$('test').innerHTML='';$('comparison').innerHTML='';$('trades').innerHTML='';try{let settings={capital:Number($('capital').value),fee:Number($('fee').value),slipTicks:2,atrMin:0.10,useSlope:true,allowLong:true,allowShort:true,tickSize:0.01};if(!(settings.capital>=100)||settings.fee<0)throw Error('Revisá capital y comisión.');let days=Number($('days').value),interval=$('interval').value,symbol=$('symbol').value;let mu=new URL('https://api.bybit.com/v5/market/instruments-info');mu.search=new URLSearchParams({category:'linear',symbol});let mr=await fetch(mu,{signal:controller.signal});if(!mr.ok)throw Error('No se pudo consultar tick size de Bybit');let md=await mr.json();if(md.retCode!==0)throw Error(md.retMsg);settings.tickSize=Number(md.result?.list?.[0]?.priceFilter?.tickSize);if(!(settings.tickSize>0))throw Error('Tick size inválido de Bybit');let rows=await fetchCandles(symbol,interval,days,controller.signal);say('Reglas Pine alineadas: pivote 10, EMA200 con pendiente, Fibonacci 50–61,8%, pinbar y stop ATR… '+rows.length+' velas');let split=Math.floor(rows.length*.7);if(split<250)throw Error('No hay suficientes velas para separar el 70/30 y calcular EMA200.');let results=runAll(rows,settings,split);render(results,split,rows);$('progress').style.width='100%';say('Prueba terminada · '+symbol+' · '+interval+'m · '+rows.length+' velas. Revisá especialmente el bloque 30%.');}catch(e){say('No se pudo completar: '+(e.message||e));}finally{controller=null;$('run').disabled=false;$('cancel').disabled=true}};
 $('cancel').onclick=()=>{if(controller)controller.abort()};$('csv').onclick=()=>{let header='fecha_utc,lado,entrada,stop,salida,neto_usdt,comisiones,motivo';let rows=lastTrades.map(t=>[new Date(t.time).toISOString(),t.side,t.entry,t.stop,t.exit,t.net,t.fees,t.reason].join(','));let blob=new Blob([header+'\n'+rows.join('\n')],{type:'text/csv'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='suarez-fibo-pinbar-backtest.csv';a.click();URL.revokeObjectURL(url)};
 </script></body></html>
