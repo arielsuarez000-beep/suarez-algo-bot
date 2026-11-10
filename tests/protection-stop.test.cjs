@@ -46,8 +46,8 @@ test('riesgo inicial inválido: conserva el stop sin dividir por cero', () => {
 });
 
 function makeHourlyBacktest() {
-  const helper = html.match(/function updateRangeProtectionStop\\(position,mode\\)\\s*\\{[\\s\\S]*?\\n\\}/);
-  const engine = html.match(/function backtestRangeHourly\\([\\s\\S]*?\\n\\}/);
+  const helper = html.match(/function updateRangeProtectionStop\(position,mode\)\s*\{[\s\S]*?\n\}/);
+  const engine = html.match(/function backtestRangeHourly\([\s\S]*?\n\}/);
   assert.ok(helper, 'No se encontró helper de protección');
   assert.ok(engine, 'No se encontró el motor horario');
   const aggregate = () => Array.from({ length: 20 }, (_, i) => ({
@@ -57,7 +57,7 @@ function makeHourlyBacktest() {
     low: 100, high: 110, width: 10, mid: 105, end: closed.at(-1).end
   });
   return new Function('rangeAggregate1h', 'rangeFindZone1h',
-    helper[0] + '\\n' + engine[0] + '\\nreturn backtestRangeHourly;'
+    helper[0] + '\n' + engine[0] + '\nreturn backtestRangeHourly;'
   )(aggregate, findZone);
 }
 
