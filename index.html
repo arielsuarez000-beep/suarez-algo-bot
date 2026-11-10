@@ -103,11 +103,14 @@ async function btFetchPage(pair,endTime,ctl){
  throw Error('Consulta histórica '+String(pair)+' falló: '+errors.join(' | '));
 }
 async function btFetchDays(pair,days,ctl,progress){
- const interval=Number($('tf').value)*60000, nowMs=Date.now(),start=nowMs-days*86400000;
- const expected=Math.ceil(days*86400000/interval),required=Math.min(expected,1000);
+ const interval=Number($('tf').value)*60000,nowMs=Date.now(),start=nowMs-days*86400000;
+ const firstExpected=Math.ceil(start/interval)*interval;
+ const lastExpected=Math.floor((nowMs-interval)/interval)*interval;
+ const expected=Math.max(0,Math.floor((lastExpected-firstExpected)/interval)+1);
+ if(expected<120)throw Error('Período demasiado corto para auditoría histórica');
  const buffer=new Map();let cursor=nowMs,requests=0;
  const maxPages=Math.ceil(expected/1000)+3;
- while(cursor>=start && requests<maxPages){
+ while(cursor>=start&&requests<maxPages){
   if(ctl.signal.aborted)throw Error('Consulta cancelada');
   const page=await btFetchPage(pair,cursor,ctl);requests++;
   let oldest=Infinity;
@@ -119,8 +122,11 @@ async function btFetchDays(pair,days,ctl,progress){
   if(page.length<200)throw Error('Bybit entregó pocas velas: período incompleto');
  }
  const rows=[...buffer.values()].sort((a,b)=>a.t-b.t);
- const earliest=rows[0]?.t;
- if(rows.length<120||!earliest||earliest>start+interval*3)throw Error('Histórico incompleto: se recibieron '+rows.length+' de aproximadamente '+expected+' velas');
+ if(rows.length!==expected)throw Error('Histórico incompleto: '+rows.length+' de '+expected+' velas esperadas');
+ if(rows[0]?.t!==firstExpected||rows.at(-1)?.t!==lastExpected)throw Error('Histórico incompleto: faltan velas al inicio o al final del período');
+ for(let i=1;i<rows.length;i++){
+  if(rows[i].t-rows[i-1].t!==interval)throw Error('Hueco en histórico entre '+new Date(rows[i-1].t).toISOString()+' y '+new Date(rows[i].t).toISOString());
+ }
  return rows;
 }
 function backtestScalp(rows,options){
