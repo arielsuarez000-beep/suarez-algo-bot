@@ -1053,7 +1053,7 @@ function backtestRangePro(rows,options){
   const {low,high,width,mid}=currentZone;
   // Re-arm only after price has visibly returned to the middle of the range.
   if(last.c>=low+.38*width&&last.c<=low+.62*width)rearmed=true;
-  if(open||!rearmed||i-lastClose<=3||balance<=0)continue;
+  if(open||!rearmed||i-lastClose<=3||balance<=0||bar.t<entryStartTime)continue;
   const bullish=last.l<=low+.18*width&&last.c>=low+.08*width&&last.c<=low+.34*width&&last.c>last.o;
   const bearish=last.h>=high-.18*width&&last.c<=high-.08*width&&last.c>=high-.34*width&&last.c<last.o;
   if(!bullish&&!bearish)continue;
@@ -1238,7 +1238,7 @@ function rangeFindZone1h(closed60,requireSideways=false){
  return {low,high,width,mid,end:closed60.at(-1).end};
 }
 
-function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false,protectRange=false,sidewaysOnly=false,centerProgress=false){
+function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false,protectRange=false,sidewaysOnly=false,centerProgress=false,entryStartTime=0){
  const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed60=rangeAggregate1h(rows);
  let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
  const stats={lowRange:0,noZone:0,weakReward:0,rangeBroken:0,sl:0,tp:0,invalid:0,invalidRisk:0,noReward:0,rrRejected:0,costRejected:0,marginRejected:0,eligible:0,guardRejected:0,guardTrend:0,guardImpulse:0,guardWick:0,sidewaysRejected:0,hourlyBreaks:0,hourlyBreaksWhileOpen:0,hourlyBreaksWhileFlat:0,stopBeforeHourlyClose:0,stopsLaterHourlyBreak:0,stopsWithoutHourlyBreak:0,rrSamples:[],costSamples:[],marginSamples:[],examples:[]};
@@ -1882,51 +1882,78 @@ $('btExcursionMulti').onclick=runRangeExcursionMulti;
    Partial closes at next bar open, with adverse slippage and fees.
    This is NOT a portfolio simulation: changed exits could change future entries. */
 function rangeMatchedExit(trade,rows,settings,mode){
- if(mode==='original')return {net:trade.pnl,protected:false,reason:trade.reason};
+ if(!['original','breakEven','partial'].includes(mode))throw Error('Unknown exit mode');
  const sign=trade.side==='LONG'?1:-1,qty=trade.qty,entry=trade.entry;
  const risk=Math.abs(entry-trade.stop),f=settings.fee/100,s=settings.slippage/100;
  if(!(risk>0&&qty>0))throw Error('Invalid trade risk/qty');
  const start=rows.findIndex(b=>b.t===trade.entryTime);
  const end=rows.findIndex(b=>b.t===trade.date);
  if(start<0||end<start)throw Error('Trade candles missing');
- let remaining=qty,net=-(entry*qty*f),armed=false,protectedAt=false,partial=false;
+ let remaining=qty,net=-(entry*qty*f),armed=false,protectedAt=false,partial=false,minEquity=net;
  const stopBE=sign===1?entry*(1+f)/(1-f)/(1-s):entry*(1-f)/(1+f)/(1+s);
- // Fee-adjusted break-even can be inside/outside original stop; never loosen the stop.
+ // Fee-adjusted break-even: net of entry/exit commission and adverse exit slippage.
+ // Never loosen the original stop.
  const be=sign===1?Math.max(trade.stop,stopBE):Math.min(trade.stop,stopBE);
  const exit=(raw,amount,alreadySlipped=false)=>{
   const px=alreadySlipped?raw:raw*(1-sign*s);
   net+=sign*(px-entry)*amount-px*amount*f;
   remaining-=amount;
+  minEquity=Math.min(minEquity,net);
  };
+ const markWorst=b=>{
+  if(remaining<=0)return;
+  const worst=sign===1?b.l:b.h;
+  // Entry fee is already in net; estimate the exit fee on the remaining size.
+  const equity=net+sign*(worst-entry)*remaining-worst*remaining*f;
+  minEquity=Math.min(minEquity,equity);
+ };
+ const finish=reason=>({
+  net:mode==='original'?trade.pnl:net,
+  protected:protectedAt,
+  reason:mode==='original'?trade.reason:reason,
+  minEquity:Math.min(minEquity,mode==='original'?trade.pnl:net)
+ });
  for(let i=start;i<=end;i++){
   const b=rows[i],last=i===end;
-  // Preserve the original engine's event priority: a confirmed hourly range break
-  // closes at the bar open before intrabar SL/TP checks. On the terminal candle,
-  // replay every exit variant at that same already-slipped execution price.
+  // A confirmed hourly range break exits at this bar's open before intrabar checks.
+  // Do not use this candle's later high/low after the position has been closed.
   if(last&&trade.reason==='RANGE BREAK'){
-   if(mode==='partial'&&armed)protectedAt=true;
    exit(trade.exit,remaining,true);
-   return {net,protected:protectedAt,reason:trade.reason};
+   return finish(trade.reason);
   }
   const stop=mode==='breakEven'&&armed?be:trade.stop;
-  // Favor adverse gaps at opening before any discretionary partial.
-  if(sign*(b.o-stop)<=0){exit(b.o,remaining);return {net,protected:protectedAt,reason:'SL/GAP'}}
-  if(mode==='partial'&&armed&&!partial){
-   exit(b.o,qty*.5);partial=true;protectedAt=true;
+  // Adverse opening gaps execute at the open before a scheduled partial.
+  if(sign*(b.o-stop)<=0){
+   exit(b.o,remaining);
+   return finish('SL/GAP');
   }
+  if(mode==='partial'&&armed&&!partial){
+   exit(b.o,qty*.5);
+   partial=true;
+   protectedAt=true;
+  }
+  // Intrabar order is unknowable from OHLC; use the adverse extreme conservatively.
+  markWorst(b);
   const hitStop=sign===1?b.l<=stop:b.h>=stop;
   const hitTarget=sign===1?b.h>=trade.take:b.l<=trade.take;
   if(hitStop||hitTarget){
-   // Keep baseline exit on terminal bar, preserving its gap fill and fees.
-   if(last&&mode==='partial'&&!partial){exit(trade.exit,remaining,true);return {net,protected:protectedAt,reason:trade.reason}}
-   if(last&&mode==='breakEven'&&!armed){exit(trade.exit,remaining,true);return {net,protected:protectedAt,reason:trade.reason}}
+   // On the terminal bar, retain the original fill until protection/partial
+   // was active before this bar. Original mode always reproduces the baseline.
+   if(last&&(mode==='original'||(mode==='partial'&&!partial)||(mode==='breakEven'&&!armed))){
+    exit(trade.exit,remaining,true);
+    return finish(trade.reason);
+   }
    exit(hitStop?stop:trade.take,remaining);
-   return {net,protected:protectedAt,reason:hitStop?'SL':'TP'};
+   return finish(hitStop?'SL':'TP');
   }
-  if(last){exit(trade.exit,remaining,true);return {net,protected:protectedAt,reason:trade.reason}}
-  // A closing-price confirmation avoids guessing whether 1R occurred before intrabar SL.
-  if(!armed&&sign*(b.c-entry)>=risk){
-   armed=true;if(mode==='breakEven')protectedAt=true;
+  if(last){
+   exit(trade.exit,remaining,true);
+   return finish(trade.reason);
+  }
+  // Only a completed 5m close can arm protection; it becomes active next bar.
+  if(mode!=='original'&&!armed&&sign*(b.c-entry)>=risk){
+   armed=true;
+   if(mode==='breakEven')protectedAt=true;
   }
  }
  throw Error('Unclosed matched trade');
@@ -1937,10 +1964,13 @@ function rangeMatchedExitStats(trades,rows,settings){
  for(const t of [...trades].sort((a,b)=>a.entryTime-b.entryTime)){
   for(const mode of modes){
    const x=rangeMatchedExit(t,rows,settings,mode),v=out[mode];
-   v.n++;v.net+=x.net;if(x.net>0){v.wins++;v.grossWin+=x.net}else if(x.net<0)v.grossLoss+=Math.abs(x.net);
+   const equityBefore=settings.capital+v.net;
+   const worstEquity=equityBefore+x.minEquity;
+   v.maxDD=Math.max(v.maxDD,(v.peak-worstEquity)/Math.max(v.peak,.000001)*100);
+   v.n++;v.net+=x.net;
+   if(x.net>0){v.wins++;v.grossWin+=x.net}else if(x.net<0)v.grossLoss+=Math.abs(x.net);
    if(x.protected)v.protected++;
    const equity=settings.capital+v.net;v.peak=Math.max(v.peak,equity);
-   v.maxDD=Math.max(v.maxDD,(v.peak-equity)/Math.max(v.peak,.000001)*100);
   }
  }
  for(const mode of modes){const v=out[mode];v.winRate=v.n?100*v.wins/v.n:0;v.profitFactor=v.grossLoss?v.grossWin/v.grossLoss:(v.grossWin?null:0)}
@@ -1963,7 +1993,7 @@ async function runRangeMatchedExitMulti(){
     const cut=Math.floor(rows.length*.7),start=rows[cut].t,warm=240;
     const firstRows=rows.slice(0,cut),lastRows=rows.slice(Math.max(0,cut-warm));
     const first=backtestRangeHourly(firstRows,settings,.06,false,false,false,false);
-    const last=backtestRangeHourly(lastRows,settings,.06,false,false,false,false);
+    const last=backtestRangeHourly(lastRows,settings,.06,false,false,false,false,start);
     ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
       last:rangeMatchedExitStats(last.trades.filter(t=>t.entryTime>=start),lastRows,settings)});
    }catch(e){if(ctl.signal.aborted)throw e;failed.push({pair,error:String(e.message||e)})}
@@ -1972,8 +2002,9 @@ async function runRangeMatchedExitMulti(){
   el.textContent='';
   btResultLine('SALIDAS COMPARADAS · rango 1h / entrada 5m · 180 días · 10 pares · solo simulación, sin órdenes Paper/Bybit.');
   btResultLine('Mismas entradas, cantidad y stop/objetivo original. ORIGINAL: cierre de referencia. EQUILIBRIO: una vela 5m debe CERRAR al menos a +1R; desde la siguiente vela se coloca stop al precio neto de equilibrio incluyendo comisiones y slippage supuesto. PARCIAL: con esa confirmación se vende 50% a la siguiente apertura y el resto conserva stop/objetivo inicial. Stop tiene prioridad si también toca objetivo en una vela.');
-  btResultLine('La prueba es por operación emparejada: NO permite nuevas entradas después de salidas anticipadas. No representa una cartera ni el cambio completo de rendimiento de una estrategia. Los extremos intravela no permiten determinar el orden exacto de ejecución.');
-  const fmtStat=v=>v.n+' ops, '+fmt(v.winRate,1)+'% acierto, neto '+fmt(v.net)+' USDT, PF '+(v.profitFactor===null?'∞':fmt(v.profitFactor))+' , DD '+fmt(v.maxDD,2)+'%, activaciones '+v.protected;
+  btResultLine('Corte temporal: primer 70% frente al último 30%. El bloque final usa 240 velas previas (20 h) solo como calentamiento; no abre operaciones antes del corte ni arrastra P&L de calentamiento. Este histórico ya pudo haberse observado y no equivale a una prueba futura no vista.');
+  btResultLine('DD intratrade estimado con el extremo adverso OHLC de cada vela mientras la posición sigue abierta; es conservador y no revela el orden real intravela. Si SL y TP se tocan en la misma vela, se prioriza SL. La comparación sigue siendo emparejada: no simula nuevas entradas tras una salida anticipada ni una cartera completa.');
+  const fmtStat=v=>v.n+' ops, '+fmt(v.winRate,1)+'% acierto, neto '+fmt(v.net)+' USDT, PF '+(v.profitFactor===null?'∞':fmt(v.profitFactor))+' , DD intratrade est. '+fmt(v.maxDD,2)+'%, activaciones '+v.protected;
   for(const x of ok){
    for(const [label,v] of [['PRIMER 70%',x.first],['ÚLTIMO 30%',x.last]]){
     btResultLine(x.pair+' · '+label+' · ORIGINAL '+fmtStat(v.original)+' · EQUILIBRIO '+fmtStat(v.breakEven)+' · PARCIAL '+fmtStat(v.partial)+'.');
