@@ -1022,7 +1022,7 @@ function backtestRangePro(rows,options){
   // Intrabar order is unknown: include resolved exit only, never post-exit candle extremes.
   p.maxFav=Math.max(p.maxFav||0,sign*(exit-p.entry));
   p.maxAdv=Math.max(p.maxAdv||0,-sign*(exit-p.entry));
-  trades.push({side:p.side,entry:p.entry,exit,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high});
+  trades.push({side:p.side,entry:p.entry,exit,rawEntry:p.rawEntry??p.entry,rawExit:raw,qty:p.qty,pnl,fees,reason:why,date:bar.t,entryTime:p.entryTime,risk:p.risk,rangeLow:p.low,rangeHigh:p.high});
   if(why==='SL')stats.sl++;else if(why==='TP')stats.tp++;else if(why==='RANGE BREAK')stats.rangeBroken++;
   open=null;lastClose=i;rearmed=false;
  }
@@ -1089,7 +1089,7 @@ function backtestRangePro(rows,options){
   if(used<1){stats.marginRejected++;blocked++;if(stats.examples.length<5)stats.examples.push({reason:'margen menor a 1 USDT',side:long?'LONG':'SHORT',rr,costMultiple,used});continue}
   stats.eligible++;
   const qty=used*leverage/entry;
-  open={side:long?'LONG':'SHORT',entry,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high,maxFav:0,maxAdv:0};
+  open={side:long?'LONG':'SHORT',entry,rawEntry:bar.o,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high,maxFav:0,maxAdv:0};
   rearmed=false;
   const sl=long?bar.l<=stop:bar.h>=stop,tp=long?bar.h>=take:bar.l<=take;
   if(sl||tp){
@@ -1499,6 +1499,22 @@ async function runRangeHourlyMulti(){
    btResultLine(r.pair+' · PRIMER 70%: '+hourlyMultiFormat(r.train));
    btResultLine(r.pair+' · ÚLTIMO 30%: '+hourlyMultiFormat(r.test));
    if(r.test.count<20)btResultLine(r.pair+' · muestra pequeña en último 30%: '+r.test.count+' operaciones.');
+  }
+  btResultLine('SENSIBILIDAD DE COSTOS: se congelan señales, timestamps, cantidad y niveles SL/TP originales; solo se reprecian fills de entrada/salida y comisiones. No se recalculan filtros ni tamaño de posición. Promedio de R ponderado por operación; no es una simulación de cartera.');
+  for(const multiple of [1.5,2]){
+   const aggregate={original:{n:0,r:0,positivePairs:0},breakEven:{n:0,r:0,positivePairs:0},partial:{n:0,r:0,positivePairs:0}};
+   for(const x of ok){
+    const stressedTrades=rangeMatchedCostTrades(x.lastTrades,settings,multiple);
+    const stressedSettings={...settings,fee:settings.fee*multiple,slippage:settings.slippage*multiple};
+    const result=rangeMatchedExitStats(stressedTrades,x.lastRows,stressedSettings);
+    for(const mode of ['original','breakEven','partial']){
+     const a=aggregate[mode],v=result[mode];a.n+=v.n;a.r+=v.expectancyR*v.n;if(v.n&&v.net>0)a.positivePairs++;
+    }
+   }
+   for(const [mode,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
+    const a=aggregate[mode];
+    btResultLine('COSTOS '+multiple+'× · ÚLTIMO 30% · '+label+' · '+a.n+' operaciones · E neta '+(a.n?fmt(a.r/a.n,3):'N/D')+'R · pares con neto positivo '+a.positivePairs+'/'+ok.length+'.');
+   }
   }
   for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
   const enough=completed.filter(r=>r.train.count>=20&&r.test.count>=20);
@@ -2009,6 +2025,18 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
  }
  throw Error('Unclosed matched trade');
 }
+function rangeMatchedCostTrades(trades,baseSettings,multiple){
+ if(!Number.isFinite(multiple)||multiple<1)throw Error('Cost multiplier must be >= 1');
+ const baseSlip=baseSettings.slippage/100,slip=baseSlip*multiple,fee=baseSettings.fee*multiple;
+ return trades.map(t=>{
+  const sign=t.side==='LONG'?1:-1;
+  const rawEntry=Number.isFinite(t.rawEntry)?t.rawEntry:t.entry/(1+sign*baseSlip);
+  const rawExit=Number.isFinite(t.rawExit)?t.rawExit:t.exit/(1-sign*baseSlip);
+  const entry=rawEntry*(1+sign*slip),exit=rawExit*(1-sign*slip);
+  const pnl=sign*(exit-entry)*t.qty-(entry+exit)*t.qty*fee/100;
+  return {...t,entry,exit,pnl};
+ });
+}
 function rangeMatchedExitStats(trades,rows,settings){
  const modes=['original','breakEven','partial'];
  const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,sumR:0,sumR2:0,maxDD:0,peak:settings.capital};
@@ -2047,8 +2075,9 @@ async function runRangeMatchedExitMulti(){
     const firstRows=rows.slice(0,cut),lastRows=rows.slice(Math.max(0,cut-warm));
     const first=backtestRangeHourly(firstRows,settings,.06,false,false,false,false);
     const last=backtestRangeHourly(lastRows,settings,.06,false,false,false,false,start);
+    const lastTrades=last.trades.filter(t=>t.entryTime>=start);
     ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
-      last:rangeMatchedExitStats(last.trades.filter(t=>t.entryTime>=start),lastRows,settings)});
+      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows});
    }catch(e){if(ctl.signal.aborted)throw e;failed.push({pair,error:String(e.message||e)})}
    el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+ok.length+' válidos · '+failed.length+' errores.';
   }
