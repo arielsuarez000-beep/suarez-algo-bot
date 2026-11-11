@@ -55,6 +55,38 @@ const trade = (overrides = {}) => ({
   assert.equal(result.net, -5, 'terminal hourly range break must retain priority over intrabar SL/TP');
 }
 {
+  const costs = {fee:0.055,slippage:0.03,capital:100};
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,112,99,110),
+    candle(2,102,105,100,103), candle(3,100,101,99,100)
+  ];
+  const result = run(trade({date:3,exit:100,reason:'SL'}), rows, costs, 'breakEven');
+  assert.ok(Math.abs(result.net) < 1e-8,
+    'long break-even stop must net to zero after entry/exit fees and exit slippage');
+  assert.equal(result.protected, true);
+}
+{
+  const costs = {fee:0.055,slippage:0.03,capital:100};
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,101,88,90),
+    candle(2,85,90,84,87), candle(3,87,88,86,87)
+  ];
+  const result = run(trade({date:3,exit:90,reason:'SL'}), rows, costs, 'breakEven');
+  assert.equal(result.reason, 'SL/GAP',
+    'an adverse opening gap must execute at the open before any scheduled protection logic');
+  assert.ok(result.net < -10, 'the adverse gap should realize more than the original 10-point stop loss');
+}
+{
+  const costs = {fee:0.055,slippage:0.03,capital:100};
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,101,112,90),
+    candle(2,98,100,90,95), candle(3,95,96,94,95)
+  ];
+  const result = run(trade({side:'SHORT',entry:100,stop:110,take:80,date:3,exit:100,reason:'SL'}), rows, costs, 'breakEven');
+  assert.ok(Math.abs(result.net) < 1e-8,
+    'short break-even stop must net to zero after entry/exit fees and exit slippage');
+}
+{
   const rows = [
     candle(0,100,101,99,100), candle(1,100,115,99,110),
     candle(2,110,112,89,100)
