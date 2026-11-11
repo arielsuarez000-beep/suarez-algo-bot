@@ -13,6 +13,17 @@ vm.runInContext(names.map(fn).join('\n'),ctx);
 const pairs=['BTCUSDT','ETHUSDT','SOLUSDT','1000PEPEUSDT','TAOUSDT','NEARUSDT','AVAXUSDT','DOGEUSDT','LINKUSDT','ARBUSDT'];
 const settings={capital:100,margin:10,leverage:10,riskPct:1,fee:0.055,slippage:0.03};
 const hosts=['https://api.bybit.com','https://api.bytick.com'],step=300000,days=180;
+function validateHistoryCoverage(rows,start,now,step){
+ const firstExpected=Math.ceil(start/step)*step;
+ const lastExpected=Math.floor((now-step)/step)*step;
+ const expected=Math.max(0,Math.floor((lastExpected-firstExpected)/step)+1);
+ if(rows.length!==expected)throw Error('Incomplete history: '+rows.length+' of '+expected+' expected candles');
+ if(rows[0]?.t!==firstExpected||rows.at(-1)?.t!==lastExpected)throw Error('History start/end does not match the expected 5m grid');
+ for(let i=1;i<rows.length;i++){
+  if(rows[i].t-rows[i-1].t!==step)throw Error('Gap or irregular timestamp in 5m history at index '+i);
+ }
+ return {firstExpected,lastExpected,expected};
+}
 async function page(pair,end){let error;for(const host of hosts){const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),20000);try{
  const u=host+'/v5/market/kline?category=linear&symbol='+pair+'&interval=5&limit=1000&end='+Math.floor(end);
  const r=await fetch(u,{signal:ac.signal});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();if(j.retCode!==0)throw Error(j.retMsg);
@@ -22,7 +33,7 @@ async function page(pair,end){let error;for(const host of hosts){const ac=new Ab
 async function history(pair){const now=Date.now(),start=now-days*86400000,buf=new Map();let cursor=now,n=0;
  while(cursor>=start&&n++<70){const a=await page(pair,cursor);let oldest=Infinity;for(const x of a){oldest=Math.min(oldest,x.t);if(x.t>=start&&x.t+step<=now)buf.set(x.t,x);}
  if(!Number.isFinite(oldest)||oldest>=cursor)throw Error('Pagination stalled');cursor=oldest-1;if(oldest<=start)break;if(a.length<200)throw Error('Short page');await new Promise(r=>setTimeout(r,150));}
- const rows=[...buf.values()].sort((a,b)=>a.t-b.t);if(rows.length<50000)throw Error('Incomplete 180-day history: '+rows.length+' candles');return rows;}
+ const rows=[...buf.values()].sort((a,b)=>a.t-b.t);validateHistoryCoverage(rows,start,now,step);return rows;}
 function summarize(trades,rows,from){const chosen=trades.filter(t=>t.entryTime>=from),s=ctx.rangeMatchedExitStats(chosen,rows,settings),o={};
  for(const k of ['original','breakEven','partial']){const x=s[k];o[k]={trades:x.n,net:+x.net.toFixed(5),winRate:+x.winRate.toFixed(2),PF:x.profitFactor===null?null:+x.profitFactor.toFixed(3),realizedDD:+x.maxDD.toFixed(3)};}return o;}
 (async()=>{const out=[],failed=[];for(let i=0;i<pairs.length;i++){const pair=pairs[i];process.stdout.write((i+1)+'/10 '+pair+' ... ');try{
