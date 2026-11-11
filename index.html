@@ -1933,7 +1933,8 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
   const px=alreadySlipped?raw:raw*(1-sign*s);
   net+=sign*(px-entry)*amount-px*amount*f;
   remaining=Math.max(0,remaining-amount);
-  if(remaining===0)observe(accountEquity+net);
+  // Keep realized partial P&L in the equity high-water path immediately.
+  observe(accountEquity+net);
  };
  const finish=reason=>{
   const finalNet=mode==='original'?trade.pnl:net;
