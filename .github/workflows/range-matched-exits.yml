@@ -14,6 +14,7 @@ on:
     paths:
       - 'index.html'
       - 'tests/range-matched-exits.test.cjs'
+      - 'tests/range-matched-exits-historical.cjs'
       - '.github/workflows/range-matched-exits.yml'
 permissions:
   contents: read
