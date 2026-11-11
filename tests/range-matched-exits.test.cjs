@@ -91,4 +91,20 @@ const trade = (overrides = {}) => ({
   assert.ok(result.original.maxDD > 21.7 && result.original.maxDD < 21.8,
     'portfolio drawdown must carry the intratrade high-water mark across sequential trades');
 }
+{
+  const historical = fs.readFileSync('tests/range-matched-exits-historical.cjs', 'utf8');
+  const coverageStart = historical.indexOf('function validateHistoryCoverage(');
+  const coverageEnd = historical.indexOf('\\nasync function page', coverageStart);
+  assert(coverageStart >= 0 && coverageEnd > coverageStart, 'historical coverage validator must exist');
+  const validate = vm.runInNewContext('(' + historical.slice(coverageStart, coverageEnd) + ')', {});
+  const step = 300000, now = 300 * step, start = now - 288 * step;
+  const rows = Array.from({length:288}, (_, i) => ({t:start + i * step}));
+  assert.equal(validate(rows, start, now, step).expected, 288,
+    'a complete aligned 5m day should be accepted');
+  assert.throws(() => validate(rows.slice(1), start, now, step), /Incomplete history/,
+    'missing candles must be rejected');
+  const irregular = rows.map((row, i) => i === 120 ? {t:row.t + 1} : row);
+  assert.throws(() => validate(irregular, start, now, step), /Gap or irregular timestamp/,
+    'irregular 5m timestamps must be rejected');
+}
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
