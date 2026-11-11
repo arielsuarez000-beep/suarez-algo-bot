@@ -121,6 +121,8 @@ const trade = (overrides = {}) => ({
   const result = stats([first,second], rows, settings);
   assert.ok(result.original.maxDD > 22.5 && result.original.maxDD < 22.7,
     'portfolio drawdown must carry the intratrade high-water mark across sequential trades');
+  assert.equal(result.original.expectancyR, 0,
+    'net expectancy in R must use the same initial stop risk for each matched trade');
 }
 {
   const historical = fs.readFileSync('tests/range-matched-exits-historical.cjs', 'utf8');
