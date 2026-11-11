@@ -36,6 +36,17 @@ const trade = (overrides = {}) => ({
 {
   const rows = [
     candle(0,100,101,99,100), candle(1,100,112,99,110),
+    candle(2,125,126,89,100)
+  ];
+  const result = run(trade({date:2,exit:90,reason:'SL',pnl:-10}), rows, settings, 'partial');
+  assert.equal(result.net, 2.5,
+    'partial half should fill at the next open while the remaining half keeps stop-first handling');
+  assert.ok(result.maxDD > 8.8 && result.maxDD < 9,
+    'realized partial profit must enter the drawdown high-water path before the remaining stop');
+}
+{
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,112,99,110),
     candle(2,100,105,99,102), candle(3,100,101,99,100)
   ];
   const result = run(trade({ date:3, exit:100, reason:'SL' }), rows, settings, 'breakEven');
