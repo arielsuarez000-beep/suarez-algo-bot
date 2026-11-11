@@ -2105,7 +2105,10 @@ async function runRangeMatchedExitMulti(){
      const foldTrades=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date<w.endTime);
      const carryIn=full.trades.filter(t=>t.entryTime<w.startTime&&t.date>=w.startTime).length;
      const cutCrossers=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date>=w.endTime).length;
-     return {...w,stats:rangeMatchedExitStats(foldTrades,rows,settings),n:foldTrades.length,carryIn,cutCrossers};
+     const firstTrade=foldTrades[0];
+     const capitalAtStart=firstTrade?settings.capital+full.trades.filter(t=>t.date<firstTrade.entryTime).reduce((sum,t)=>sum+t.pnl,0):settings.capital;
+     const foldSettings={...settings,capital:capitalAtStart};
+     return {...w,stats:rangeMatchedExitStats(foldTrades,rows,foldSettings),n:foldTrades.length,carryIn,cutCrossers,capitalAtStart};
     });
     ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
       last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows,walkForward});
