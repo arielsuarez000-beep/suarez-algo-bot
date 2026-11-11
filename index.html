@@ -1892,6 +1892,10 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
  const sign=trade.side==='LONG'?1:-1,qty=trade.qty,entry=trade.entry;
  const risk=Math.abs(entry-trade.stop),f=settings.fee/100,s=settings.slippage/100;
  if(!(risk>0&&qty>0))throw Error('Invalid trade risk/qty');
+ const stopBE=sign===1?entry*(1+f)/(1-f)/(1-s):entry*(1-f)/(1+f)/(1+s);
+ // Fee-adjusted break-even includes entry/exit commission and adverse exit slippage.
+ // Never loosen the original stop.
+ const be=sign===1?Math.max(trade.stop,stopBE):Math.min(trade.stop,stopBE);
  const start=rows.findIndex(b=>b.t===trade.entryTime);
  const end=rows.findIndex(b=>b.t===trade.date);
  if(start<0||end<start)throw Error('Trade candles missing');
@@ -2010,14 +2014,14 @@ function rangeMatchedExitStats(trades,rows,settings){
  const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,maxDD:0,peak:settings.capital};
  for(const t of [...trades].sort((a,b)=>a.entryTime-b.entryTime)){
   for(const mode of modes){
-   const x=rangeMatchedExit(t,rows,settings,mode),v=out[mode];
-   const equityBefore=settings.capital+v.net;
-   const worstEquity=equityBefore+x.minEquity;
-   v.maxDD=Math.max(v.maxDD,(v.peak-worstEquity)/Math.max(v.peak,.000001)*100);
+   const v=out[mode],equityBefore=settings.capital+v.net;
+   const x=rangeMatchedExit(t,rows,settings,mode,equityBefore,v.peak);
+   v.maxDD=Math.max(v.maxDD,x.maxDD);
+   v.peak=Math.max(v.peak,x.peakEquity);
    v.n++;v.net+=x.net;
    if(x.net>0){v.wins++;v.grossWin+=x.net}else if(x.net<0)v.grossLoss+=Math.abs(x.net);
    if(x.protected)v.protected++;
-   const equity=settings.capital+v.net;v.peak=Math.max(v.peak,equity);
+   v.peak=Math.max(v.peak,settings.capital+v.net);
   }
  }
  for(const mode of modes){const v=out[mode];v.winRate=v.n?100*v.wins/v.n:0;v.profitFactor=v.grossLoss?v.grossWin/v.grossLoss:(v.grossWin?null:0)}
