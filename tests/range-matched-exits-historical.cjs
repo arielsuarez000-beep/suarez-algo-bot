@@ -35,7 +35,7 @@ async function history(pair){const now=Date.now(),start=now-days*86400000,buf=ne
  if(!Number.isFinite(oldest)||oldest>=cursor)throw Error('Pagination stalled');cursor=oldest-1;if(oldest<=start)break;if(a.length<200)throw Error('Short page');await new Promise(r=>setTimeout(r,150));}
  const rows=[...buf.values()].sort((a,b)=>a.t-b.t);validateHistoryCoverage(rows,start,now,step);return rows;}
 function summarize(trades,rows,from){const chosen=trades.filter(t=>t.entryTime>=from),s=ctx.rangeMatchedExitStats(chosen,rows,settings),o={};
- for(const k of ['original','breakEven','partial']){const x=s[k];o[k]={trades:x.n,net:+x.net.toFixed(5),winRate:+x.winRate.toFixed(2),PF:x.profitFactor===null?null:+x.profitFactor.toFixed(3),realizedDD:+x.maxDD.toFixed(3)};}return o;}
+ for(const k of ['original','breakEven','partial']){const x=s[k];o[k]={trades:x.n,net:+x.net.toFixed(5),winRate:+x.winRate.toFixed(2),expectancyR:+x.expectancyR.toFixed(4),PF:x.profitFactor===null?null:+x.profitFactor.toFixed(3),intratradeDD:+x.maxDD.toFixed(3)};}return o;}
 (async()=>{const out=[],failed=[];for(let i=0;i<pairs.length;i++){const pair=pairs[i];process.stdout.write((i+1)+'/10 '+pair+' ... ');try{
  const rows=await history(pair),cut=Math.floor(rows.length*.7),split=rows[cut].t,warm=240;
  const a=ctx.backtestRangeHourly(rows.slice(0,cut),settings,.06,false,false,false,false);
