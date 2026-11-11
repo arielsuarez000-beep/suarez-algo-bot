@@ -1500,6 +1500,19 @@ async function runRangeHourlyMulti(){
    btResultLine(r.pair+' · ÚLTIMO 30%: '+hourlyMultiFormat(r.test));
    if(r.test.count<20)btResultLine(r.pair+' · muestra pequeña en último 30%: '+r.test.count+' operaciones.');
   }
+  btResultLine('WALK-FORWARD: primeros 30 días reservados como bloque inicial no puntuado; luego 5 ventanas cronológicas de 30 días con reglas congeladas, sin reoptimización. Se excluyen operaciones que cruzan el final de cada ventana y se informan posiciones que entran desde el bloque previo.');
+  for(let fold=0;fold<5;fold++){
+   const subset=ok.map(x=>x.walkForward[fold]).filter(Boolean);
+   if(!subset.length)continue;
+   for(const [mode,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
+    const n=subset.reduce((sum,w)=>sum+w.stats[mode].n,0);
+    const r=subset.reduce((sum,w)=>sum+w.stats[mode].expectancyR*w.stats[mode].n,0);
+    const positivePairs=subset.filter(w=>w.stats[mode].n&&w.stats[mode].net>0).length;
+    const carry=subset.reduce((sum,w)=>sum+w.carryIn,0),cross=subset.reduce((sum,w)=>sum+w.cutCrossers,0);
+    btResultLine('WALK-FORWARD · BLOQUE '+(fold+1)+'/5 · '+label+' · '+n+' ops · E neta '+(n?fmt(r/n,3):'N/D')+'R · pares netos positivos '+positivePairs+'/'+subset.length+' · entradas arrastradas '+carry+' · cruces de ventana excluidos '+cross+'.');
+    if(n<100)btResultLine('WALK-FORWARD · BLOQUE '+(fold+1)+'/5 · muestra agregada menor a 100 operaciones: evidencia todavía corta.');
+   }
+  }
   btResultLine('SENSIBILIDAD DE COSTOS: se congelan señales, timestamps, cantidad y niveles SL/TP originales; solo se reprecian fills de entrada/salida y comisiones. No se recalculan filtros ni tamaño de posición. Promedio de R ponderado por operación; no es una simulación de cartera.');
   for(const multiple of [1.5,2]){
    const aggregate={original:{n:0,r:0,positivePairs:0},breakEven:{n:0,r:0,positivePairs:0},partial:{n:0,r:0,positivePairs:0}};
@@ -2038,6 +2051,16 @@ function rangeMatchedCostTrades(trades,baseSettings,multiple){
   return {...t,entry,exit,pnl};
  });
 }
+function rangeWalkForwardWindows(rows,trainDays=30,foldDays=30,interval=300000){
+ const barsPerDay=86400000/interval;
+ if(!Number.isInteger(barsPerDay)||trainDays<0||foldDays<1)throw Error('Invalid walk-forward window');
+ const foldBars=foldDays*barsPerDay,firstIndex=Math.floor(trainDays*barsPerDay),out=[];
+ for(let startIndex=firstIndex;startIndex<rows.length;startIndex+=foldBars){
+  const endIndex=Math.min(rows.length,startIndex+foldBars);
+  out.push({fold:out.length+1,startIndex,endIndex,startTime:rows[startIndex].t,endTime:rows[endIndex-1].t+interval});
+ }
+ return out;
+}
 function rangeMatchedExitStats(trades,rows,settings){
  const modes=['original','breakEven','partial'];
  const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,sumR:0,sumR2:0,maxDD:0,peak:settings.capital};
@@ -2077,8 +2100,15 @@ async function runRangeMatchedExitMulti(){
     const first=backtestRangeHourly(firstRows,settings,.06,false,false,false,false);
     const last=backtestRangeHourly(lastRows,settings,.06,false,false,false,false,start);
     const lastTrades=last.trades.filter(t=>t.entryTime>=start);
+    const full=backtestRangeHourly(rows,settings,.06,false,false,false,false);
+    const walkForward=rangeWalkForwardWindows(rows,30,30,300000).map(w=>{
+     const foldTrades=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date<w.endTime);
+     const carryIn=full.trades.filter(t=>t.entryTime<w.startTime&&t.date>=w.startTime).length;
+     const cutCrossers=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date>=w.endTime).length;
+     return {...w,stats:rangeMatchedExitStats(foldTrades,rows,settings),n:foldTrades.length,carryIn,cutCrossers};
+    });
     ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
-      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows});
+      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows,walkForward});
    }catch(e){if(ctl.signal.aborted)throw e;failed.push({pair,error:String(e.message||e)})}
    el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+ok.length+' válidos · '+failed.length+' errores.';
   }
