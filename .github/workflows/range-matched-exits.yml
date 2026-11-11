@@ -6,6 +6,7 @@ on:
     paths:
       - 'index.html'
       - 'tests/range-matched-exits.test.cjs'
+      - 'tests/range-matched-exits-historical.cjs'
       - '.github/workflows/range-matched-exits.yml'
   pull_request:
     branches:
@@ -26,6 +27,8 @@ jobs:
           node-version: 20
       - name: Verify matched exit replay
         run: node tests/range-matched-exits.test.cjs
+      - name: Verify historical audit script syntax
+        run: node --check tests/range-matched-exits-historical.cjs
 
 
 # Bybit historical data is audited from the user's browser because GitHub-hosted runners receive HTTP 403.
