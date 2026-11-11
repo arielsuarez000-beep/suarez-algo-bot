@@ -164,6 +164,9 @@ const trade = (overrides = {}) => ({
   };
   trade.pnl = (trade.exit-trade.entry)*qty
     - (trade.entry+trade.exit)*qty*base.fee/100;
+  const baseRepriced = reprice([trade],base,1)[0];
+  assert.ok(Math.abs(baseRepriced.pnl-trade.pnl)<1e-10,
+    '1x cost repricing must reproduce the baseline net P&L');
   const stressed = reprice([trade],base,2)[0];
   assert.equal(stressed.entry,rawEntry*(1+sign*base.slippage*2/100),
     '2x stress must reprice the same raw entry with doubled slippage');
@@ -172,5 +175,17 @@ const trade = (overrides = {}) => ({
   assert.equal(stressed.entryTime,trade.entryTime);
   assert.equal(stressed.qty,trade.qty);
   assert.ok(stressed.pnl<trade.pnl, 'higher fees/slippage should reduce net P&L for this long trade');
+}
+{
+  const wfStart = html.indexOf('function rangeWalkForwardWindows(');
+  const wfEnd = html.indexOf('\\nfunction rangeMatchedExitStats', wfStart);
+  assert(wfStart >= 0 && wfEnd > wfStart, 'walk-forward window helper must exist');
+  const windows = vm.runInNewContext('(' + html.slice(wfStart, wfEnd) + ')', {})(
+    Array.from({length:180*288}, (_, i) => ({t:i*300000})), 30, 30, 300000
+  );
+  assert.equal(windows.length, 5, '180 days after a 30-day initial block should produce five 30-day folds');
+  assert.equal(windows[0].startIndex, 30*288);
+  assert.equal(windows[0].endIndex, 60*288);
+  assert.equal(windows[4].endIndex, 180*288);
 }
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
