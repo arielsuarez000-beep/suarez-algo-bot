@@ -3,6 +3,10 @@ const vm = require('node:vm');
 const assert = require('node:assert/strict');
 
 const html = fs.readFileSync('index.html', 'utf8');
+const inlineScripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)]
+  .map(match => match[1]).filter(source => source.trim());
+assert(inlineScripts.length > 0, 'index.html must contain an inline script');
+for (const source of inlineScripts) new vm.Script(source);
 const start = html.indexOf('function rangeMatchedExit(');
 const end = html.indexOf('\nfunction rangeMatchedExitStats', start);
 assert(start >= 0 && end > start, 'rangeMatchedExit must exist in index.html');
@@ -71,7 +75,7 @@ const trade = (overrides = {}) => ({
 }
 {
   const statsStart = html.indexOf('function rangeMatchedExitStats(');
-  const statsEnd = html.indexOf('\\nasync function runRangeMatchedExitMulti', statsStart);
+  const statsEnd = html.indexOf('\nasync function runRangeMatchedExitMulti', statsStart);
   assert(statsStart >= 0 && statsEnd > statsStart, 'rangeMatchedExitStats must exist');
   const statsSource = html.slice(statsStart, statsEnd);
   const stats = vm.runInNewContext('(' + statsSource + ')', {rangeMatchedExit: run});
