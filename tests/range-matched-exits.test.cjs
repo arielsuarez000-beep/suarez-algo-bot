@@ -8,10 +8,14 @@ const inlineScripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)
 assert(inlineScripts.length > 0, 'index.html must contain an inline script');
 for (const source of inlineScripts) new vm.Script(source);
 const start = html.indexOf('function rangeMatchedExit(');
-const end = html.indexOf('\nfunction rangeMatchedExitStats', start);
+const end = html.indexOf('\nfunction rangeMatchedCostTrades', start);
 assert(start >= 0 && end > start, 'rangeMatchedExit must exist in index.html');
 const source = html.slice(start, end);
 const run = vm.runInNewContext('(' + source + ')', {});
+const costStart = html.indexOf('function rangeMatchedCostTrades(');
+const costEnd = html.indexOf('\\nfunction rangeMatchedExitStats', costStart);
+assert(costStart >= 0 && costEnd > costStart, 'rangeMatchedCostTrades must exist');
+const reprice = vm.runInNewContext('(' + html.slice(costStart, costEnd) + ')', {});
 const settings = { fee: 0, slippage: 0, capital: 100 };
 const candle = (t, o, h, l, c) => ({ t, o, h, l, c });
 const trade = (overrides = {}) => ({
@@ -139,5 +143,23 @@ const trade = (overrides = {}) => ({
   const irregular = rows.map((row, i) => i === 120 ? {t:row.t + 1} : row);
   assert.throws(() => validate(irregular, start, now, step), /Gap or irregular timestamp/,
     'irregular 5m timestamps must be rejected');
+}
+{
+  const base = {fee:0.055,slippage:0.03};
+  const rawEntry = 100, rawExit = 110, qty = 1, sign = 1;
+  const trade = {
+    side:'LONG',rawEntry,rawExit,entry:rawEntry*(1+sign*base.slippage/100),
+    exit:rawExit*(1-sign*base.slippage/100),qty,entryTime:10
+  };
+  trade.pnl = (trade.exit-trade.entry)*qty
+    - (trade.entry+trade.exit)*qty*base.fee/100;
+  const stressed = reprice([trade],base,2)[0];
+  assert.equal(stressed.entry,rawEntry*(1+sign*base.slippage*2/100),
+    '2x stress must reprice the same raw entry with doubled slippage');
+  assert.equal(stressed.exit,rawExit*(1-sign*base.slippage*2/100),
+    '2x stress must reprice the same raw exit with doubled slippage');
+  assert.equal(stressed.entryTime,trade.entryTime);
+  assert.equal(stressed.qty,trade.qty);
+  assert.ok(stressed.pnl<trade.pnl, 'higher fees/slippage should reduce net P&L for this long trade');
 }
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
