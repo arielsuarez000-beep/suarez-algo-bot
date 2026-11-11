@@ -87,6 +87,7 @@ const trade = (overrides = {}) => ({
   const first = trade({date:2,exit:90,reason:'SL',pnl:-10});
   const second = trade({entryTime:3,date:5,exit:110,reason:'RANGE BREAK',pnl:10});
   const result = stats([first,second], rows, settings);
+  console.log('DEBUG stats original', result.original);
   assert.ok(result.original.maxDD > 21.7 && result.original.maxDD < 21.8,
     'portfolio drawdown must carry the intratrade high-water mark across sequential trades');
 }
