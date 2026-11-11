@@ -94,7 +94,7 @@ const trade = (overrides = {}) => ({
 {
   const historical = fs.readFileSync('tests/range-matched-exits-historical.cjs', 'utf8');
   const coverageStart = historical.indexOf('function validateHistoryCoverage(');
-  const coverageEnd = historical.indexOf('\\nasync function page', coverageStart);
+  const coverageEnd = historical.indexOf('\nasync function page', coverageStart);
   assert(coverageStart >= 0 && coverageEnd > coverageStart, 'historical coverage validator must exist');
   const validate = vm.runInNewContext('(' + historical.slice(coverageStart, coverageEnd) + ')', {});
   const step = 300000, now = 300 * step, start = now - 288 * step;
