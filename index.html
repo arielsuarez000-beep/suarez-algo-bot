@@ -2111,12 +2111,14 @@ async function runRangeMatchedExitMulti(){
      return {...w,stats:rangeMatchedExitStats(foldTrades,rows,foldSettings),n:foldTrades.length,carryIn,cutCrossers,capitalAtStart};
     });
     ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
-      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows,walkForward});
+      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows,walkForward,
+      firstOpen:first.open,lastOpen:last.open,fullOpen:full.open});
    }catch(e){if(ctl.signal.aborted)throw e;failed.push({pair,error:String(e.message||e)})}
    el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+ok.length+' válidos · '+failed.length+' errores.';
   }
   el.textContent='';
   btResultLine('SALIDAS COMPARADAS · rango 1h / entrada 5m · 180 días · 10 pares · solo simulación, sin órdenes Paper/Bybit.');
+  btResultLine('Costos base por lado: comisión '+fmt(settings.fee,3)+'% · slippage supuesto '+fmt(settings.slippage,3)+'%.');
   btResultLine('Mismas entradas, cantidad y stop/objetivo original. ORIGINAL: cierre de referencia. EQUILIBRIO: una vela 5m debe CERRAR al menos a +1R; desde la siguiente vela se coloca stop al precio neto de equilibrio incluyendo comisiones y slippage supuesto. PARCIAL: con esa confirmación se vende 50% a la siguiente apertura y el resto conserva stop/objetivo inicial. Stop tiene prioridad si también toca objetivo en una vela.');
   btResultLine('Corte temporal: primer 70% frente al último 30%. El bloque final usa 240 velas previas (20 h) solo como calentamiento; no abre operaciones antes del corte ni arrastra P&L de calentamiento. Este histórico ya pudo haberse observado y no equivale a una prueba futura no vista.');
   btResultLine('DD máximo intratrade estimado sobre equity de liquidación, incluyendo comisión y slippage. En velas OHLC sin doble toque se usa el extremo favorable antes del adverso; si SL y TP coinciden, gana SL y no se acredita el extremo favorable de esa vela. En TP único se considera el extremo adverso antes del fill. Es una envolvente conservadora, no reconstruye el orden intravela real. La comparación sigue siendo emparejada y no simula una cartera completa.');
@@ -2129,6 +2131,7 @@ async function runRangeMatchedExitMulti(){
   }
   for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
   btResultLine('RESUMEN: '+ok.length+'/'+pairs.length+' procesados · '+failed.length+' errores · positivo último 30%: original '+ok.filter(x=>x.last.original.net>0).length+'/'+ok.length+', equilibrio '+ok.filter(x=>x.last.breakEven.net>0).length+'/'+ok.length+', parcial '+ok.filter(x=>x.last.partial.net>0).length+'/'+ok.length+'.');
+  btResultLine('POSICIONES ABIERTAS AL CORTE: primer 70% '+ok.filter(x=>x.firstOpen).length+'/'+ok.length+' · último 30% '+ok.filter(x=>x.lastOpen).length+'/'+ok.length+' · histórico continuo '+ok.filter(x=>x.fullOpen).length+'/'+ok.length+'. Se excluyen de operaciones cerradas, P&L y expectativa.');
   btResultLine('Exploración sobre historia conocida. No elegir parámetros por estos resultados ni usar dinero real. La ejecución y financiación reales no están modeladas.');
  }catch(e){el.textContent='Comparación incompleta: '+String(e.message||e)+'. No se usan resultados parciales.'}
  finally{btUi(false);btController=null}
