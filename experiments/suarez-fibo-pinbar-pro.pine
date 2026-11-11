@@ -1,0 +1,135 @@
+//@version=6
+strategy("SUAREZ FIBO PINBAR PRO · EXPERIMENTAL", overlay=true, initial_capital=1000, currency=currency.USDT, pyramiding=0, commission_type=strategy.commission.percent, commission_value=0.055, slippage=2, process_orders_on_close=false, calc_on_order_fills=true)
+
+// EXPERIMENTAL ONLY. No connection to Bybit orders or the app's active Paper engine.
+// Test on liquid USDT perpetuals, preferably 5m/15m. Include funding separately in evaluation.
+
+groupTrend = "1 · Tendencia"
+emaLen = input.int(200, "EMA", minval=20, group=groupTrend)
+useSlope = input.bool(true, "Exigir pendiente EMA a favor", group=groupTrend)
+
+groupSwing = "2 · Swing y Fibonacci"
+pivotLen = input.int(10, "Confirmación de pivote", minval=2, group=groupSwing)
+fibMin = input.float(0.50, "Retroceso mínimo", minval=0.1, maxval=0.9, step=0.001, group=groupSwing)
+fibMax = input.float(0.618, "Retroceso máximo", minval=0.1, maxval=0.9, step=0.001, group=groupSwing)
+maxLegAtr = input.float(30.0, "Tamaño máximo del impulso (ATR)", minval=1, group=groupSwing)
+
+groupPin = "3 · Pinbar"
+wickBodyRatio = input.float(2.0, "Mecha / cuerpo mínimo", minval=1, step=0.1, group=groupPin)
+maxOppWick = input.float(0.8, "Mecha contraria / cuerpo máximo", minval=0, step=0.1, group=groupPin)
+closeZone = input.float(0.30, "Cierre dentro del extremo (%)", minval=0.05, maxval=0.5, step=0.05, group=groupPin)
+
+groupRisk = "4 · Riesgo y salida"
+riskPct = input.float(0.50, "Riesgo por operación (% equity)", minval=0.1, maxval=2, step=0.1, group=groupRisk)
+atrLen = input.int(14, "ATR", minval=2, group=groupRisk)
+atrBuffer = input.float(0.20, "Margen ATR detrás del pinbar", minval=0, step=0.05, group=groupRisk)
+maxStopAtr = input.float(3.0, "Distancia máxima del stop (ATR)", minval=0.5, step=0.1, group=groupRisk)
+targetR = input.float(2.0, "Objetivo (R): comparar 1.5 / 2.0", minval=0.5, maxval=5, step=0.25, group=groupRisk)
+minAtrPct = input.float(0.10, "ATR mínimo (% precio)", minval=0, step=0.01, group=groupRisk)
+allowLong = input.bool(true, "Permitir LONG", group=groupRisk)
+allowShort = input.bool(true, "Permitir SHORT", group=groupRisk)
+
+ema = ta.ema(close, emaLen)
+atr = ta.atr(atrLen)
+plot(ema, "EMA 200", color=color.orange, linewidth=2)
+
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+var float lastHigh = na
+var int lastHighBar = na
+var float lastLow = na
+var int lastLowBar = na
+if not na(ph)
+    lastHigh := ph
+    lastHighBar := bar_index - pivotLen
+if not na(pl)
+    lastLow := pl
+    lastLowBar := bar_index - pivotLen
+
+validBullLeg = not na(lastLow) and not na(lastHigh) and lastLowBar < lastHighBar and lastHigh > lastLow
+validBearLeg = not na(lastLow) and not na(lastHigh) and lastHighBar < lastLowBar and lastHigh > lastLow
+bullRange = validBullLeg ? lastHigh - lastLow : na
+bearRange = validBearLeg ? lastHigh - lastLow : na
+bullSizeOK = validBullLeg and bullRange <= atr * maxLegAtr
+bearSizeOK = validBearLeg and bearRange <= atr * maxLegAtr
+fibLongDeep = validBullLeg ? lastHigh - bullRange * fibMax : na
+fibLongShallow = validBullLeg ? lastHigh - bullRange * fibMin : na
+fibShortShallow = validBearLeg ? lastLow + bearRange * fibMin : na
+fibShortDeep = validBearLeg ? lastLow + bearRange * fibMax : na
+inLongZone = bullSizeOK and close >= fibLongDeep and close <= fibLongShallow
+inShortZone = bearSizeOK and close >= fibShortShallow and close <= fibShortDeep
+
+candleRange = math.max(high - low, syminfo.mintick)
+body = math.max(math.abs(close - open), syminfo.mintick)
+lowerWick = math.min(open, close) - low
+upperWick = high - math.max(open, close)
+bullPin = close > open and lowerWick >= body * wickBodyRatio and upperWick <= body * maxOppWick and (high - close) / candleRange <= closeZone
+bearPin = close < open and upperWick >= body * wickBodyRatio and lowerWick <= body * maxOppWick and (close - low) / candleRange <= closeZone
+
+trendLong = close > ema and (not useSlope or ema > ema[1])
+trendShort = close < ema and (not useSlope or ema < ema[1])
+volatilityOK = atr / close * 100 >= minAtrPct
+confirmed = barstate.isconfirmed
+longSignal = confirmed and allowLong and strategy.position_size == 0 and trendLong and inLongZone and bullPin and volatilityOK
+shortSignal = confirmed and allowShort and strategy.position_size == 0 and trendShort and inShortZone and bearPin and volatilityOK
+
+var float pendingStop = na
+var float activeStop = na
+var float activeTarget = na
+var float activeRisk = na
+var int lastEntryBar = na
+
+longStopCandidate = low - atr * atrBuffer
+shortStopCandidate = high + atr * atrBuffer
+longDistance = close - longStopCandidate
+shortDistance = shortStopCandidate - close
+longQty = longDistance > syminfo.mintick ? (strategy.equity * riskPct / 100) / (longDistance * syminfo.pointvalue) : na
+shortQty = shortDistance > syminfo.mintick ? (strategy.equity * riskPct / 100) / (shortDistance * syminfo.pointvalue) : na
+longRiskOK = longDistance > syminfo.mintick and longDistance <= atr * maxStopAtr and not na(longQty) and longQty > 0
+shortRiskOK = shortDistance > syminfo.mintick and shortDistance <= atr * maxStopAtr and not na(shortQty) and shortQty > 0
+
+if longSignal and longRiskOK
+    pendingStop := longStopCandidate
+    strategy.entry("LONG", strategy.long, qty=longQty, alert_message="SUAREZ FIBO PINBAR PRO LONG")
+if shortSignal and shortRiskOK
+    pendingStop := shortStopCandidate
+    strategy.entry("SHORT", strategy.short, qty=shortQty, alert_message="SUAREZ FIBO PINBAR PRO SHORT")
+
+// Initialize stop/target only after TradingView confirms the market entry fill.
+newLong = strategy.position_size > 0 and strategy.position_size[1] <= 0
+newShort = strategy.position_size < 0 and strategy.position_size[1] >= 0
+if newLong
+    activeStop := pendingStop
+    activeRisk := strategy.position_avg_price - activeStop
+    activeTarget := strategy.position_avg_price + activeRisk * targetR
+    lastEntryBar := bar_index
+if newShort
+    activeStop := pendingStop
+    activeRisk := activeStop - strategy.position_avg_price
+    activeTarget := strategy.position_avg_price - activeRisk * targetR
+    lastEntryBar := bar_index
+
+if strategy.position_size > 0 and not na(activeStop) and not na(activeTarget)
+    strategy.exit("LONG EXIT", "LONG", stop=activeStop, limit=activeTarget, alert_message="SUAREZ FIBO PINBAR PRO LONG EXIT")
+if strategy.position_size < 0 and not na(activeStop) and not na(activeTarget)
+    strategy.exit("SHORT EXIT", "SHORT", stop=activeStop, limit=activeTarget, alert_message="SUAREZ FIBO PINBAR PRO SHORT EXIT")
+
+// Clear stored levels only after a real open-to-flat transition.
+closedPosition = strategy.position_size == 0 and strategy.position_size[1] != 0
+if closedPosition
+    pendingStop := na
+    activeStop := na
+    activeTarget := na
+    activeRisk := na
+    lastEntryBar := na
+
+plot(strategy.position_size != 0 ? activeStop : na, "Stop activo", color=color.red, style=plot.style_linebr, linewidth=2)
+plot(strategy.position_size != 0 ? activeTarget : na, "Objetivo activo", color=color.lime, style=plot.style_linebr, linewidth=2)
+plotshape(longSignal and longRiskOK, title="Señal LONG", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.tiny, text="FIBO L")
+plotshape(shortSignal and shortRiskOK, title="Señal SHORT", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny, text="FIBO S")
+
+// Alert() is optional; strategy order-fill alerts should use the alert_message values above.
+if longSignal and longRiskOK
+    alert("FIBO PINBAR PRO LONG · " + syminfo.ticker + " · cierre confirmado", alert.freq_once_per_bar_close)
+if shortSignal and shortRiskOK
+    alert("FIBO PINBAR PRO SHORT · " + syminfo.ticker + " · cierre confirmado", alert.freq_once_per_bar_close)
