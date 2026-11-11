@@ -35,7 +35,7 @@ const trade = (overrides = {}) => ({
 }
 {
   const rows = [
-    candle(0,100,101,99,100), candle(1,100,112,99,110),
+    candle(0,100,101,99,100), candle(1,110,112,110,110),
     candle(2,125,126,89,100)
   ];
   const result = run(trade({date:2,exit:90,reason:'SL',pnl:-10}), rows, settings, 'partial');
