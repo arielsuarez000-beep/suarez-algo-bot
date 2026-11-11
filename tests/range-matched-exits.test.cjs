@@ -178,7 +178,7 @@ const trade = (overrides = {}) => ({
 }
 {
   const wfStart = html.indexOf('function rangeWalkForwardWindows(');
-  const wfEnd = html.indexOf('\\nfunction rangeMatchedExitStats', wfStart);
+  const wfEnd = html.indexOf('\nfunction rangeMatchedExitStats', wfStart);
   assert(wfStart >= 0 && wfEnd > wfStart, 'walk-forward window helper must exist');
   const windows = vm.runInNewContext('(' + html.slice(wfStart, wfEnd) + ')', {})(
     Array.from({length:180*288}, (_, i) => ({t:i*300000})), 30, 30, 300000
