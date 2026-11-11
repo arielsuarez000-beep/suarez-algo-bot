@@ -68,7 +68,7 @@ const trade = (overrides = {}) => ({
 {
   const costs = {fee:0.055,slippage:0.03,capital:100};
   const rows = [
-    candle(0,100,101,99,100), candle(1,100,101,88,90),
+    candle(0,100,101,99,100), candle(1,100,112,99,110),
     candle(2,85,90,84,87), candle(3,87,88,86,87)
   ];
   const result = run(trade({date:3,exit:90,reason:'SL'}), rows, costs, 'breakEven');
@@ -79,7 +79,7 @@ const trade = (overrides = {}) => ({
 {
   const costs = {fee:0.055,slippage:0.03,capital:100};
   const rows = [
-    candle(0,100,101,99,100), candle(1,100,101,112,90),
+    candle(0,100,101,99,100), candle(1,100,101,88,90),
     candle(2,98,100,90,95), candle(3,95,96,94,95)
   ];
   const result = run(trade({side:'SHORT',entry:100,stop:110,take:80,date:3,exit:100,reason:'SL'}), rows, costs, 'breakEven');
