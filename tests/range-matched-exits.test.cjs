@@ -8,7 +8,7 @@ const end = html.indexOf('\nfunction rangeMatchedExitStats', start);
 assert(start >= 0 && end > start, 'rangeMatchedExit must exist in index.html');
 const source = html.slice(start, end);
 const run = vm.runInNewContext('(' + source + ')', {});
-const settings = { fee: 0, slippage: 0 };
+const settings = { fee: 0, slippage: 0, capital: 100 };
 const candle = (t, o, h, l, c) => ({ t, o, h, l, c });
 const trade = (overrides = {}) => ({
   side: 'LONG', qty: 1, entry: 100, stop: 90, take: 120,
@@ -50,4 +50,40 @@ const trade = (overrides = {}) => ({
   const result = run(trade({ date:2, exit:95, reason:'RANGE BREAK' }), rows, settings, 'partial');
   assert.equal(result.net, -5, 'terminal hourly range break must retain priority over intrabar SL/TP');
 }
-console.log('PASS: partial next-open execution, confirmed break-even, stop-first ambiguity, range-break priority');
+{
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,115,99,110),
+    candle(2,110,112,89,100)
+  ];
+  const result = run(trade({date:2,exit:90,reason:'SL',pnl:-10}), rows, settings, 'original');
+  assert.ok(result.maxDD > 21.7 && result.maxDD < 21.8,
+    'drawdown must include the intratrade high-water mark before the adverse stop');
+}
+{
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,115,99,110),
+    candle(2,110,112,89,100)
+  ];
+  const costs = {fee:0.055,slippage:0.03,capital:100};
+  const result = run(trade({date:2,exit:89.973,reason:'SL',pnl:-10.131485}), rows, costs, 'original');
+  assert.ok(result.maxDD > 21.7,
+    'intratrade liquidation marks must include exit commission and slippage');
+}
+{
+  const statsStart = html.indexOf('function rangeMatchedExitStats(');
+  const statsEnd = html.indexOf('\\nasync function runRangeMatchedExitMulti', statsStart);
+  assert(statsStart >= 0 && statsEnd > statsStart, 'rangeMatchedExitStats must exist');
+  const statsSource = html.slice(statsStart, statsEnd);
+  const stats = vm.runInNewContext('(' + statsSource + ')', {rangeMatchedExit: run});
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,115,99,110),
+    candle(2,110,112,89,100), candle(3,100,101,99,100),
+    candle(4,100,115,99,110), candle(5,110,121,109,115)
+  ];
+  const first = trade({date:2,exit:90,reason:'SL',pnl:-10});
+  const second = trade({entryTime:3,date:5,exit:110,reason:'RANGE BREAK',pnl:10});
+  const result = stats([first,second], rows, settings);
+  assert.ok(result.original.maxDD > 21.7 && result.original.maxDD < 21.8,
+    'portfolio drawdown must carry the intratrade high-water mark across sequential trades');
+}
+console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
