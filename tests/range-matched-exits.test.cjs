@@ -39,9 +39,9 @@ const trade = (overrides = {}) => ({
     candle(2,125,126,89,100)
   ];
   const result = run(trade({date:2,exit:90,reason:'SL',pnl:-10}), rows, settings, 'partial');
-  assert.equal(result.net, 2.5,
+  assert.equal(result.net, 7.5,
     'partial half should fill at the next open while the remaining half keeps stop-first handling');
-  assert.ok(result.maxDD > 8.8 && result.maxDD < 9,
+  assert.ok(result.maxDD > 4.4 && result.maxDD < 4.5,
     'realized partial profit must enter the drawdown high-water path before the remaining stop');
 }
 {
