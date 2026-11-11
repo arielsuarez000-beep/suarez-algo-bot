@@ -1887,7 +1887,7 @@ $('btExcursionMulti').onclick=runRangeExcursionMulti;
    A same-candle SL takes precedence; exit-bar extremes are never used after exit.
    Partial closes at next bar open, with adverse slippage and fees.
    This is NOT a portfolio simulation: changed exits could change future entries. */
-function rangeMatchedExit(trade,rows,settings,mode){
+function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinite(settings.capital)?settings.capital:100),priorPeak=accountEquity){
  if(!['original','breakEven','partial'].includes(mode))throw Error('Unknown exit mode');
  const sign=trade.side==='LONG'?1:-1,qty=trade.qty,entry=trade.entry;
  const risk=Math.abs(entry-trade.stop),f=settings.fee/100,s=settings.slippage/100;
@@ -1895,30 +1895,31 @@ function rangeMatchedExit(trade,rows,settings,mode){
  const start=rows.findIndex(b=>b.t===trade.entryTime);
  const end=rows.findIndex(b=>b.t===trade.date);
  if(start<0||end<start)throw Error('Trade candles missing');
- let remaining=qty,net=-(entry*qty*f),armed=false,protectedAt=false,partial=false,minEquity=net;
- const stopBE=sign===1?entry*(1+f)/(1-f)/(1-s):entry*(1-f)/(1+f)/(1+s);
- // Fee-adjusted break-even: net of entry/exit commission and adverse exit slippage.
- // Never loosen the original stop.
- const be=sign===1?Math.max(trade.stop,stopBE):Math.min(trade.stop,stopBE);
+ let remaining=qty,net=-(entry*qty*f),armed=false,protectedAt=false,partial=false;
+ let peakEquity=priorPeak,maxDD=0,minEquity=0;
+ const observe=equity=>{
+  peakEquity=Math.max(peakEquity,equity);
+  if(peakEquity>0)maxDD=Math.max(maxDD,(peakEquity-equity)/peakEquity*100);
+  minEquity=Math.min(minEquity,equity-accountEquity);
+ };
+ const markAt=raw=>{
+  if(remaining<=0)return;
+  const px=raw*(1-sign*s);
+  const equity=accountEquity+net+sign*(px-entry)*remaining-px*remaining*f;
+  observe(equity);
+ };
+ // Exit slippage and fees are included in both realized P&L and liquidation marks.
  const exit=(raw,amount,alreadySlipped=false)=>{
   const px=alreadySlipped?raw:raw*(1-sign*s);
   net+=sign*(px-entry)*amount-px*amount*f;
-  remaining-=amount;
-  minEquity=Math.min(minEquity,net);
+  remaining=Math.max(0,remaining-amount);
+  if(remaining===0)observe(accountEquity+net);
  };
- const markWorst=b=>{
-  if(remaining<=0)return;
-  const worst=sign===1?b.l:b.h;
-  // Entry fee is already in net; estimate the exit fee on the remaining size.
-  const equity=net+sign*(worst-entry)*remaining-worst*remaining*f;
-  minEquity=Math.min(minEquity,equity);
+ const finish=reason=>{
+  const finalNet=mode==='original'?trade.pnl:net;
+  observe(accountEquity+finalNet);
+  return {net:finalNet,protected:protectedAt,reason:mode==='original'?trade.reason:reason,minEquity,peakEquity,maxDD};
  };
- const finish=reason=>({
-  net:mode==='original'?trade.pnl:net,
-  protected:protectedAt,
-  reason:mode==='original'?trade.reason:reason,
-  minEquity:Math.min(minEquity,mode==='original'?trade.pnl:net)
- });
  for(let i=start;i<=end;i++){
   const b=rows[i],last=i===end;
   // A confirmed hourly range break exits at this bar's open before intrabar checks.
@@ -1938,24 +1939,64 @@ function rangeMatchedExit(trade,rows,settings,mode){
    partial=true;
    protectedAt=true;
   }
-  // Intrabar order is unknowable from OHLC; use the adverse extreme conservatively.
-  markWorst(b);
   const hitStop=sign===1?b.l<=stop:b.h>=stop;
   const hitTarget=sign===1?b.h>=trade.take:b.l<=trade.take;
-  if(hitStop||hitTarget){
-   // On the terminal bar, retain the original fill until protection/partial
-   // was active before this bar. Original mode always reproduces the baseline.
-   if(last&&(mode==='original'||(mode==='partial'&&!partial)||(mode==='breakEven'&&!armed))){
-    exit(trade.exit,remaining,true);
-    return finish(trade.reason);
+  const openBeyondTarget=sign*(b.o-trade.take)>=0;
+  // Preserve the original engine's terminal fill when no new protection was active.
+  if(last&&(mode==='original'||(mode==='partial'&&!partial)||(mode==='breakEven'&&!armed))){
+   if(hitStop&&hitTarget){
+    if(!openBeyondTarget)markAt(b.o);
+   }else if(hitStop){
+    markAt(b.o);
+    markAt(sign===1?b.h:b.l);
+   }else if(hitTarget){
+    if(!openBeyondTarget){
+     markAt(b.o);
+     markAt(sign===1?b.l:b.h);
+    }
+   }else{
+    markAt(b.o);
+    markAt(sign===1?b.h:b.l);
+    markAt(sign===1?b.l:b.h);
    }
-   exit(hitStop?stop:trade.take,remaining);
-   return finish(hitStop?'SL':'TP');
-  }
-  if(last){
    exit(trade.exit,remaining,true);
    return finish(trade.reason);
   }
+  if(hitStop&&hitTarget){
+   // OHLC cannot reveal the order. Match the baseline's conservative stop-first rule.
+   // If the open itself is beyond target, do not credit that price as an unrealized peak.
+   if(!openBeyondTarget)markAt(b.o);
+   exit(stop,remaining);
+   return finish('SL');
+  }
+  if(hitStop){
+   // With no target touch, the favorable extreme may precede the stop; use that
+   // worst-case ordering for the intratrade drawdown envelope.
+   markAt(b.o);
+   markAt(sign===1?b.h:b.l);
+   exit(stop,remaining);
+   return finish('SL');
+  }
+  if(hitTarget){
+   // On a favorable opening gap, keep the baseline's conservative target-price fill.
+   if(!openBeyondTarget){
+    markAt(b.o);
+    markAt(sign===1?b.l:b.h);
+   }
+   exit(trade.take,remaining);
+   return finish('TP');
+  }
+  if(last){
+   markAt(b.o);
+   markAt(sign===1?b.h:b.l);
+   markAt(sign===1?b.l:b.h);
+   exit(trade.exit,remaining,true);
+   return finish(trade.reason);
+  }
+  // Conservative OHLC envelope: favorable extreme first, adverse extreme second.
+  markAt(b.o);
+  markAt(sign===1?b.h:b.l);
+  markAt(sign===1?b.l:b.h);
   // Only a completed 5m close can arm protection; it becomes active next bar.
   if(mode!=='original'&&!armed&&sign*(b.c-entry)>=risk){
    armed=true;
