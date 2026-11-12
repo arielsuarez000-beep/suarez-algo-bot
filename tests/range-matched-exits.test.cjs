@@ -186,7 +186,7 @@ const trade = (overrides = {}) => ({
 }
 {
   const statsStart = html.indexOf('function rangeMatchedExitStats(');
-  const statsEnd = html.indexOf('\\nasync function runRangeMatchedExitMulti', statsStart);
+  const statsEnd = html.indexOf('\nasync function runRangeMatchedExitMulti', statsStart);
   assert(statsStart >= 0 && statsEnd > statsStart, 'rangeMatchedExitStats must exist for cost stress');
   const stats = vm.runInNewContext('(' + html.slice(statsStart, statsEnd) + ')', {rangeMatchedExit:run});
   const base = {fee:0.055,slippage:0.03,capital:100};
@@ -224,16 +224,16 @@ const trade = (overrides = {}) => ({
 {
   const historical = fs.readFileSync('tests/range-matched-exits-historical.cjs','utf8');
   const runStart = html.indexOf('async function runRangeMatchedExitMulti()');
-  const runEnd = html.indexOf("\\n$('btCompareExits').onclick",runStart);
+  const runEnd = html.indexOf("\n$('btCompareExits').onclick",runStart);
   assert(runStart>=0&&runEnd>runStart,'matched-exit UI runner must exist');
   const runner=html.slice(runStart,runEnd);
-  assert.match(runner,/rangeMatchedCostTrades\\(lastTrades,settings,multiple\\)/,
+  assert.match(runner,/rangeMatchedCostTrades\(lastTrades,settings,multiple\)/,
     'UI must execute frozen-entry 1.5x/2x cost sensitivity');
   assert.match(runner,/WALK-FORWARD/,
     'UI must display the walk-forward folds it computes');
-  assert.match(historical,/ctx\\.rangeWalkForwardWindows/,
+  assert.match(historical,/ctx\.rangeWalkForwardWindows/,
     'standalone historical report must include walk-forward folds');
-  assert.match(historical,/ctx\\.rangeMatchedCostTrades/,
+  assert.match(historical,/ctx\.rangeMatchedCostTrades/,
     'standalone historical report must include cost stress');
   assert.match(historical,/false,false,false,false,split/,
     'standalone OOS backtest must prohibit entries before the cutoff while warming up');
