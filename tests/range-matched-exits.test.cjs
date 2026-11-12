@@ -235,6 +235,8 @@ const trade = (overrides = {}) => ({
     'standalone historical report must include walk-forward folds');
   assert.match(historical,/ctx\.rangeMatchedCostTrades/,
     'standalone historical report must include cost stress');
+  assert.match(historical,/errors\.push\(host\+/,
+    'historical audit must preserve host-specific Bybit HTTP errors');
   assert.match(historical,/false,false,false,false,split/,
     'standalone OOS backtest must prohibit entries before the cutoff while warming up');
 }
