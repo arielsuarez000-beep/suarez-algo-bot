@@ -240,4 +240,32 @@ const trade = (overrides = {}) => ({
   assert.match(historical,/false,false,false,false,split/,
     'standalone OOS backtest must prohibit entries before the cutoff while warming up');
 }
+
+{
+  const helperStart=html.indexOf('function rangePairedBlockBootstrap(');
+  const helperEnd=html.indexOf('\nfunction rangeMatchedExitStats',helperStart);
+  assert(helperStart>=0&&helperEnd>helperStart,'paired block bootstrap helper must exist');
+  const bootstrap=vm.runInNewContext('('+html.slice(helperStart,helperEnd)+')',{Math,Number,Array,Map,Object});
+  const samples=Array.from({length:28},(_,i)=>({time:i*86400000,r:(i%5-2)*0.03}));
+  const pairStats=[{
+    pair:'TESTUSDT',
+    original:{samples},
+    breakEven:{samples:samples.map(x=>({...x,r:x.r-0.2}))},
+    partial:{samples:samples.map(x=>({...x,r:x.r-0.05}))}
+  }];
+  const a=bootstrap(pairStats,7,500,12345),b=bootstrap(pairStats,7,500,12345);
+  assert.deepEqual(JSON.parse(JSON.stringify(a)),JSON.parse(JSON.stringify(b)),
+    'bootstrap output must be deterministic for a fixed seed');
+  assert.ok(Math.abs(a.metrics.breakEvenMinusOriginal.mean+0.2)<1e-12,
+    'paired break-even minus original expectancy must preserve the exact -0.2R effect');
+  assert.ok(Math.abs(a.metrics.partialMinusOriginal.mean+0.05)<1e-12,
+    'paired partial minus original expectancy must preserve the exact -0.05R effect');
+  assert.ok(Math.abs(a.metrics.breakEvenMinusOriginal.lower95+0.2)<1e-12&&
+    Math.abs(a.metrics.breakEvenMinusOriginal.upper95+0.2)<1e-12,
+    'block bootstrap must retain a constant paired treatment effect');
+  assert.equal(a.trades,28);
+  assert.throws(()=>bootstrap([{pair:'BAD',original:{samples},breakEven:{samples:samples.slice(1)},partial:{samples}}],7,500,1),
+    /Matched sample counts differ/,'unmatched exit samples must be rejected');
+}
+
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
