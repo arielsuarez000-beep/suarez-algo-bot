@@ -151,7 +151,7 @@ const trade = (overrides = {}) => ({
     'a complete aligned 5m day should be accepted');
   assert.throws(() => validate(rows.slice(1), start, now, step), /Incomplete history/,
     'missing candles must be rejected');
-  const irregular = rows.map((row, i) => i === 120 ? {t:row.t + 1} : row);
+  const irregular = rows.map((row, i) => i === 120 ? {...row,t:row.t + 1} : row);
   assert.throws(() => validate(irregular, start, now, step), /Gap or irregular timestamp/,
     'irregular 5m timestamps must be rejected');
   const invalidHigh = rows.map((row, i) => i === 120 ? {...row,h:99} : row);
