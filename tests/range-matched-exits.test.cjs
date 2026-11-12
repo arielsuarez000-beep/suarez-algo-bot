@@ -146,7 +146,7 @@ const trade = (overrides = {}) => ({
   assert(coverageStart >= 0 && coverageEnd > coverageStart, 'historical coverage validator must exist');
   const validate = vm.runInNewContext('(' + historical.slice(coverageStart, coverageEnd) + ')', {});
   const step = 300000, now = 300 * step, start = now - 288 * step;
-  const rows = Array.from({length:288}, (_, i) => ({t:start + i * step}));
+  const rows = Array.from({length:288}, (_, i) => ({t:start + i * step,o:100,h:101,l:99,c:100,v:0}));
   assert.equal(validate(rows, start, now, step).expected, 288,
     'a complete aligned 5m day should be accepted');
   assert.throws(() => validate(rows.slice(1), start, now, step), /Incomplete history/,
@@ -154,6 +154,12 @@ const trade = (overrides = {}) => ({
   const irregular = rows.map((row, i) => i === 120 ? {t:row.t + 1} : row);
   assert.throws(() => validate(irregular, start, now, step), /Gap or irregular timestamp/,
     'irregular 5m timestamps must be rejected');
+  const invalidHigh = rows.map((row, i) => i === 120 ? {...row,h:99} : row);
+  assert.throws(() => validate(invalidHigh, start, now, step), /Invalid OHLCV/,
+    'inconsistent OHLC values must be rejected');
+  const invalidVolume = rows.map((row, i) => i === 120 ? {...row,v:-1} : row);
+  assert.throws(() => validate(invalidVolume, start, now, step), /Invalid OHLCV/,
+    'negative volume must be rejected');
 }
 {
   const base = {fee:0.055,slippage:0.03};
@@ -174,7 +180,34 @@ const trade = (overrides = {}) => ({
     '2x stress must reprice the same raw exit with doubled slippage');
   assert.equal(stressed.entryTime,trade.entryTime);
   assert.equal(stressed.qty,trade.qty);
+  assert.equal(stressed.stop,trade.stop);
+  assert.equal(stressed.take,trade.take);
   assert.ok(stressed.pnl<trade.pnl, 'higher fees/slippage should reduce net P&L for this long trade');
+}
+{
+  const statsStart = html.indexOf('function rangeMatchedExitStats(');
+  const statsEnd = html.indexOf('\\nasync function runRangeMatchedExitMulti', statsStart);
+  assert(statsStart >= 0 && statsEnd > statsStart, 'rangeMatchedExitStats must exist for cost stress');
+  const stats = vm.runInNewContext('(' + html.slice(statsStart, statsEnd) + ')', {rangeMatchedExit:run});
+  const base = {fee:0.055,slippage:0.03,capital:100};
+  const rawEntry=100,rawExit=120,qty=1,sign=1;
+  const entry=rawEntry*(1+sign*base.slippage/100),exit=rawExit*(1-sign*base.slippage/100);
+  const matched=trade({entry,exit,rawEntry,rawExit,stop:90,take:120,date:3,reason:'TP',
+    pnl:(exit-entry)*qty-(entry+exit)*qty*base.fee/100});
+  const rows=[
+    candle(0,100,101,99,100),candle(1,100,112,99,111),
+    candle(2,105,111,104,109),candle(3,108,121,107,120)
+  ];
+  const baseStats=stats([matched],rows,base);
+  const stressedSettings={...base,fee:base.fee*2,slippage:base.slippage*2};
+  const stressedTrades=reprice([matched],base,2);
+  const stressedStats=stats(stressedTrades,rows,stressedSettings);
+  for(const mode of ['original','breakEven','partial']){
+    assert.equal(stressedStats[mode].n,baseStats[mode].n,
+      'cost stress must preserve the matched trade count for '+mode);
+    assert.ok(stressedStats[mode].net<baseStats[mode].net,
+      'doubling costs should reduce net P&L for '+mode);
+  }
 }
 {
   const wfStart = html.indexOf('function rangeWalkForwardWindows(');
@@ -187,5 +220,22 @@ const trade = (overrides = {}) => ({
   assert.equal(windows[0].startIndex, 30*288);
   assert.equal(windows[0].endIndex, 60*288);
   assert.equal(windows[4].endIndex, 180*288);
+}
+{
+  const historical = fs.readFileSync('tests/range-matched-exits-historical.cjs','utf8');
+  const runStart = html.indexOf('async function runRangeMatchedExitMulti()');
+  const runEnd = html.indexOf("\\n$('btCompareExits').onclick",runStart);
+  assert(runStart>=0&&runEnd>runStart,'matched-exit UI runner must exist');
+  const runner=html.slice(runStart,runEnd);
+  assert.match(runner,/rangeMatchedCostTrades\\(lastTrades,settings,multiple\\)/,
+    'UI must execute frozen-entry 1.5x/2x cost sensitivity');
+  assert.match(runner,/WALK-FORWARD/,
+    'UI must display the walk-forward folds it computes');
+  assert.match(historical,/ctx\\.rangeWalkForwardWindows/,
+    'standalone historical report must include walk-forward folds');
+  assert.match(historical,/ctx\\.rangeMatchedCostTrades/,
+    'standalone historical report must include cost stress');
+  assert.match(historical,/false,false,false,false,split/,
+    'standalone OOS backtest must prohibit entries before the cutoff while warming up');
 }
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
