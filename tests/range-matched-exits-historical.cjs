@@ -27,12 +27,12 @@ function validateHistoryCoverage(rows,start,now,step){
  }
  return {firstExpected,lastExpected,expected};
 }
-async function page(pair,end){let error;for(const host of hosts){const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),20000);try{
+async function page(pair,end){const errors=[];for(const host of hosts){const ac=new AbortController(),timer=setTimeout(()=>ac.abort(),20000);try{
  const u=host+'/v5/market/kline?category=linear&symbol='+pair+'&interval=5&limit=1000&end='+Math.floor(end);
  const r=await fetch(u,{signal:ac.signal});if(!r.ok)throw Error('HTTP '+r.status);const j=await r.json();if(j.retCode!==0)throw Error(j.retMsg);
  const rows=j.result.list.map(x=>({t:+x[0],o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]})).filter(x=>[x.t,x.o,x.h,x.l,x.c,x.v].every(Number.isFinite));
  if(rows.length)return rows;throw Error('No candles');
- }catch(e){error=e;}finally{clearTimeout(timer);}}throw error||Error('API failed');}
+ }catch(e){errors.push(host+': '+String(e.message||e));}finally{clearTimeout(timer);}}throw Error(errors.join(' | ')||'API failed');}
 async function history(pair){const now=Date.now(),start=now-days*86400000,buf=new Map();let cursor=now,n=0;
  while(cursor>=start&&n++<70){const a=await page(pair,cursor);let oldest=Infinity;for(const x of a){oldest=Math.min(oldest,x.t);if(x.t>=start&&x.t+step<=now)buf.set(x.t,x);}
  if(!Number.isFinite(oldest)||oldest>=cursor)throw Error('Pagination stalled');cursor=oldest-1;if(oldest<=start)break;if(a.length<200)throw Error('Short page');await new Promise(r=>setTimeout(r,150));}
