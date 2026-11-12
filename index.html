@@ -1529,6 +1529,17 @@ async function runRangeHourlyMulti(){
     btResultLine('COSTOS '+multiple+'× · ÚLTIMO 30% · '+label+' · '+a.n+' operaciones · E neta '+(a.n?fmt(a.r/a.n,3):'N/D')+'R · pares con neto positivo '+a.positivePairs+'/'+ok.length+'.');
    }
   }
+  for(const x of ok){
+   const wfText=x.walkForward.map(w=>'F'+w.fold+': '+w.n+' ops; arrastradas '+w.carryIn+'; cruces '+w.cutCrossers+
+    '; O '+fmt(w.stats.original.expectancyR,3)+'R/DD '+fmt(w.stats.original.maxDD,2)+'%'+
+    '; E '+fmt(w.stats.breakEven.expectancyR,3)+'R/DD '+fmt(w.stats.breakEven.maxDD,2)+'%'+
+    '; P '+fmt(w.stats.partial.expectancyR,3)+'R/DD '+fmt(w.stats.partial.maxDD,2)+'%').join(' | ');
+   btResultLine(x.pair+' · WALK-FORWARD (DD local por pliegue; arrastradas y cruces excluidos del conteo) · '+wfText+'.');
+   for(const c of x.costStress){
+    btResultLine(x.pair+' · COSTOS '+fmt(c.multiple,1)+'x sobre ÚLTIMO 30% · ORIGINAL '+fmtStat(c.stats.original)+
+     ' · EQUILIBRIO '+fmtStat(c.stats.breakEven)+' · PARCIAL '+fmtStat(c.stats.partial)+'.');
+   }
+  }
   for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
   const enough=completed.filter(r=>r.train.count>=20&&r.test.count>=20);
   const bothProfitable=enough.filter(r=>r.train.net>0&&r.test.net>0);
@@ -2105,13 +2116,19 @@ async function runRangeMatchedExitMulti(){
      const foldTrades=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date<w.endTime);
      const carryIn=full.trades.filter(t=>t.entryTime<w.startTime&&t.date>=w.startTime).length;
      const cutCrossers=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date>=w.endTime).length;
-     const firstTrade=foldTrades[0];
-     const capitalAtStart=firstTrade?settings.capital+full.trades.filter(t=>t.date<firstTrade.entryTime).reduce((sum,t)=>sum+t.pnl,0):settings.capital;
-     const foldSettings={...settings,capital:capitalAtStart};
-     return {...w,stats:rangeMatchedExitStats(foldTrades,rows,foldSettings),n:foldTrades.length,carryIn,cutCrossers,capitalAtStart};
+     // Fold-local DD: reset every variant to the same reference capital. Entry timestamps,
+     // quantity and original SL/TP remain frozen from the full-period baseline.
+     const foldSettings={...settings,capital:settings.capital};
+     return {...w,stats:rangeMatchedExitStats(foldTrades,rows,foldSettings),n:foldTrades.length,carryIn,cutCrossers,drawdownBasis:'fold-local'};
+    });
+    // Reprice only the already-generated OOS trades; do not regenerate signals or sizing.
+    const costStress=[1.5,2].map(multiple=>{
+     const stressedSettings={...settings,fee:settings.fee*multiple,slippage:settings.slippage*multiple};
+     const stressedTrades=rangeMatchedCostTrades(lastTrades,settings,multiple);
+     return {multiple,stats:rangeMatchedExitStats(stressedTrades,lastRows,stressedSettings)};
     });
     ok.push({pair,first:rangeMatchedExitStats(first.trades,firstRows,settings),
-      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows,walkForward,
+      last:rangeMatchedExitStats(lastTrades,lastRows,settings),lastTrades,lastRows,walkForward,costStress,
       firstOpen:first.open,lastOpen:last.open,fullOpen:full.open});
    }catch(e){if(ctl.signal.aborted)throw e;failed.push({pair,error:String(e.message||e)})}
    el.textContent='SALIDAS · '+(i+1)+'/'+pairs.length+' · '+ok.length+' válidos · '+failed.length+' errores.';
@@ -2131,6 +2148,17 @@ async function runRangeMatchedExitMulti(){
   }
   for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
   btResultLine('RESUMEN: '+ok.length+'/'+pairs.length+' procesados · '+failed.length+' errores · positivo último 30%: original '+ok.filter(x=>x.last.original.net>0).length+'/'+ok.length+', equilibrio '+ok.filter(x=>x.last.breakEven.net>0).length+'/'+ok.length+', parcial '+ok.filter(x=>x.last.partial.net>0).length+'/'+ok.length+'.');
+  const wfAll=ok.flatMap(x=>x.walkForward);
+  btResultLine('WALK-FORWARD: expectativa neta positiva por pliegue · ORIGINAL '+wfAll.filter(w=>w.stats.original.expectancyR>0).length+'/'+wfAll.length+
+   ' · EQUILIBRIO '+wfAll.filter(w=>w.stats.breakEven.expectancyR>0).length+'/'+wfAll.length+
+   ' · PARCIAL '+wfAll.filter(w=>w.stats.partial.expectancyR>0).length+'/'+wfAll.length+
+   '. Son pliegues históricos con DD local; no equivalen a una prueba futura no vista.');
+  for(const multiple of [1.5,2]){
+   const stressed=ok.flatMap(x=>x.costStress.filter(c=>c.multiple===multiple));
+   btResultLine('COSTOS '+fmt(multiple,1)+'x · pares con neto positivo en ÚLTIMO 30% · ORIGINAL '+stressed.filter(c=>c.stats.original.net>0).length+'/'+stressed.length+
+    ' · EQUILIBRIO '+stressed.filter(c=>c.stats.breakEven.net>0).length+'/'+stressed.length+
+    ' · PARCIAL '+stressed.filter(c=>c.stats.partial.net>0).length+'/'+stressed.length+'.');
+  }
   btResultLine('POSICIONES ABIERTAS AL CORTE: primer 70% '+ok.filter(x=>x.firstOpen).length+'/'+ok.length+' · último 30% '+ok.filter(x=>x.lastOpen).length+'/'+ok.length+' · histórico continuo '+ok.filter(x=>x.fullOpen).length+'/'+ok.length+'. Se excluyen de operaciones cerradas, P&L y expectativa.');
   btResultLine('Exploración sobre historia conocida. No elegir parámetros por estos resultados ni usar dinero real. La ejecución y financiación reales no están modeladas.');
  }catch(e){el.textContent='Comparación incompleta: '+String(e.message||e)+'. No se usan resultados parciales.'}
