@@ -1529,6 +1529,19 @@ async function runRangeHourlyMulti(){
     btResultLine('COSTOS '+multiple+'× · ÚLTIMO 30% · '+label+' · '+a.n+' operaciones · E neta '+(a.n?fmt(a.r/a.n,3):'N/D')+'R · pares con neto positivo '+a.positivePairs+'/'+ok.length+'.');
    }
   }
+  btResultLine('INFERENCIA EMPAREJADA · bootstrap por bloques móviles de días UTC; conserva juntas las operaciones de todos los pares del mismo día para respetar parte de la dependencia temporal y la correlación entre activos. Intervalos percentiles 95%; no eliminan sesgo de selección ni sustituyen prueba futura.'); 
+  for(const blockDays of [3,7,14]){
+   const inference=rangePairedBlockBootstrap(ok.map(x=>({pair:x.pair,original:x.last.original,breakEven:x.last.breakEven,partial:x.last.partial})),blockDays,2000,20261112+blockDays);
+   if(!inference.available){btResultLine('BOOTSTRAP '+blockDays+' días: no disponible · '+inference.reason+'.');continue;}
+   for(const [key,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
+    const m=inference.metrics[key];
+    btResultLine('BOOTSTRAP '+blockDays+'d · '+label+' · E '+fmt(m.mean,3)+'R · IC95% ['+fmt(m.lower95,3)+'R, '+fmt(m.upper95,3)+'R] · P(E>0) bootstrap '+fmt(m.bootstrapPositiveProbability*100,1)+'% · '+inference.trades+' operaciones / '+inference.calendarDays+' días.');
+   }
+   for(const [key,label] of [['breakEvenMinusOriginal','EQUILIBRIO − ORIGINAL'],['partialMinusOriginal','PARCIAL − ORIGINAL']]){
+    const m=inference.metrics[key];
+    btResultLine('DIFERENCIA EMPAREJADA '+blockDays+'d · '+label+' · ΔE '+fmt(m.mean,3)+'R · IC95% ['+fmt(m.lower95,3)+'R, '+fmt(m.upper95,3)+'R]. Si el intervalo incluye 0, no hay evidencia clara de superioridad.');
+   }
+  }
   for(const x of ok){
    const wfText=x.walkForward.map(w=>'F'+w.fold+': '+w.n+' ops; arrastradas '+w.carryIn+'; cruces '+w.cutCrossers+
     '; O '+fmt(w.stats.original.expectancyR,3)+'R/DD '+fmt(w.stats.original.maxDD,2)+'%'+
@@ -2072,9 +2085,62 @@ function rangeWalkForwardWindows(rows,trainDays=30,foldDays=30,interval=300000){
  }
  return out;
 }
+function rangePairedBlockBootstrap(pairStats,blockDays=7,reps=2000,seed=20261112){
+ if(!Number.isInteger(blockDays)||blockDays<1||!Number.isInteger(reps)||reps<200)throw Error('Invalid bootstrap settings');
+ const byDay=new Map();
+ for(const p of pairStats){
+  const o=p.original?.samples||[],b=p.breakEven?.samples||[],q=p.partial?.samples||[];
+  if(o.length!==b.length||o.length!==q.length)throw Error('Matched sample counts differ for '+p.pair);
+  for(let i=0;i<o.length;i++){
+   if(o[i].time!==b[i].time||o[i].time!==q[i].time)throw Error('Matched trade timestamps differ for '+p.pair);
+   const day=Math.floor(o[i].time/86400000);
+   if(!byDay.has(day))byDay.set(day,[]);
+   byDay.get(day).push({original:o[i].r,breakEven:b[i].r,partial:q[i].r});
+  }
+ }
+ const days=[...byDay.keys()].sort((a,b)=>a-b);
+ if(!days.length)return {available:false,reason:'No matched OOS trades'};
+ const first=days[0],span=days.at(-1)-first+1;
+ if(span<blockDays*2)return {available:false,reason:'Too few calendar days for block length '+blockDays};
+ const calendar=Array.from({length:span},(_,i)=>byDay.get(first+i)||[]);
+ let state=(seed>>>0)||1;
+ const random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296};
+ const names=['original','breakEven','partial'];
+ const diffs=['breakEvenMinusOriginal','partialMinusOriginal'];
+ const point={};for(const n of names)point[n]={sum:0,n:0};
+ for(const d of diffs)point[d]={sum:0,n:0};
+ for(const day of calendar)for(const x of day){
+  for(const n of names){point[n].sum+=x[n];point[n].n++}
+  point.breakEvenMinusOriginal.sum+=x.breakEven-x.original;point.breakEvenMinusOriginal.n++;
+  point.partialMinusOriginal.sum+=x.partial-x.original;point.partialMinusOriginal.n++;
+ }
+ const values={};for(const k of [...names,...diffs])values[k]=[];
+ for(let r=0;r<reps;r++){
+  const sums={};for(const k of [...names,...diffs])sums[k]={sum:0,n:0};
+  let picked=0;
+  while(picked<span){
+   const start=Math.floor(random()*(span-blockDays+1));
+   for(let j=0;j<blockDays&&picked<span;j++,picked++){
+    for(const x of calendar[start+j]){
+     for(const n of names){sums[n].sum+=x[n];sums[n].n++}
+     sums.breakEvenMinusOriginal.sum+=x.breakEven-x.original;sums.breakEvenMinusOriginal.n++;
+     sums.partialMinusOriginal.sum+=x.partial-x.original;sums.partialMinusOriginal.n++;
+    }
+   }
+  }
+  for(const k of [...names,...diffs])if(sums[k].n)values[k].push(sums[k].sum/sums[k].n);
+ }
+ const quantile=(arr,p)=>{const x=[...arr].sort((a,b)=>a-b),i=(x.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return x[lo]+(x[hi]-x[lo])*(i-lo)};
+ const result={available:true,blockDays,reps,calendarDays:span,trades:point.original.n,metrics:{}};
+ for(const k of [...names,...diffs]){
+  const arr=values[k],mean=point[k].n?point[k].sum/point[k].n:0;
+  result.metrics[k]={mean,lower95:arr.length?quantile(arr,.025):null,upper95:arr.length?quantile(arr,.975):null,bootstrapPositiveProbability:arr.length?arr.filter(x=>x>0).length/arr.length:null};
+ }
+ return result;
+}
 function rangeMatchedExitStats(trades,rows,settings){
  const modes=['original','breakEven','partial'];
- const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,sumR:0,sumR2:0,maxDD:0,peak:settings.capital};
+ const out={};for(const mode of modes)out[mode]={n:0,net:0,wins:0,protected:0,grossWin:0,grossLoss:0,sumR:0,sumR2:0,samples:[],maxDD:0,peak:settings.capital};
  for(const t of [...trades].sort((a,b)=>a.entryTime-b.entryTime)){
   for(const mode of modes){
    const v=out[mode],equityBefore=settings.capital+v.net;
@@ -2083,7 +2149,7 @@ function rangeMatchedExitStats(trades,rows,settings){
    v.peak=Math.max(v.peak,x.peakEquity);
    v.n++;v.net+=x.net;
    const initialRisk=Math.abs(t.entry-t.stop)*t.qty;
-   if(initialRisk>0){const r=x.net/initialRisk;v.sumR+=r;v.sumR2+=r*r}
+   if(initialRisk>0){const r=x.net/initialRisk;v.sumR+=r;v.sumR2+=r*r;v.samples.push({time:t.entryTime,r,net:x.net,initialRisk})}
    if(x.net>0){v.wins++;v.grossWin+=x.net}else if(x.net<0)v.grossLoss+=Math.abs(x.net);
    if(x.protected)v.protected++;
    v.peak=Math.max(v.peak,settings.capital+v.net);
