@@ -267,6 +267,14 @@ const trade = (overrides = {}) => ({
   assert.equal(a.effectiveBlocks,10);
   assert.equal(a.activeDays,70);
   assert.equal(bootstrap(pairStats,7,500,12345,10).available,true);
+  const fiftyFour=samples.slice(0,54);
+  const fiftyFourPairs=[{pair:'OOS54',original:{samples:fiftyFour},breakEven:{samples:fiftyFour},partial:{samples:fiftyFour}}];
+  assert.equal(bootstrap(fiftyFourPairs,3,500,7,10).available,true,
+    '54 calendar days should support the exploratory 3-day block bootstrap');
+  assert.equal(bootstrap(fiftyFourPairs,7,500,7,10).available,false,
+    '54 calendar days should not claim ten independent 7-day blocks');
+  assert.equal(bootstrap(fiftyFourPairs,14,500,7,10).available,false,
+    '54 calendar days should not claim ten independent 14-day blocks');
   const shortSamples=samples.slice(0,28);
   assert.equal(bootstrap([{pair:'SHORT',original:{samples:shortSamples},breakEven:{samples:shortSamples},partial:{samples:shortSamples}}],7,500,1,10).available,false,
     'short calendar histories must not emit apparently precise bootstrap intervals');
