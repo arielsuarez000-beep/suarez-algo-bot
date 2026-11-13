@@ -1500,64 +1500,7 @@ async function runRangeHourlyMulti(){
    btResultLine(r.pair+' · ÚLTIMO 30%: '+hourlyMultiFormat(r.test));
    if(r.test.count<20)btResultLine(r.pair+' · muestra pequeña en último 30%: '+r.test.count+' operaciones.');
   }
-  btResultLine('WALK-FORWARD: primeros 30 días reservados como bloque inicial no puntuado; luego 5 ventanas cronológicas de 30 días con reglas congeladas, sin reoptimización. Se excluyen operaciones que cruzan el final de cada ventana y se informan posiciones que entran desde el bloque previo.');
-  for(let fold=0;fold<5;fold++){
-   const subset=ok.map(x=>x.walkForward[fold]).filter(Boolean);
-   if(!subset.length)continue;
-   for(const [mode,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
-    const n=subset.reduce((sum,w)=>sum+w.stats[mode].n,0);
-    const r=subset.reduce((sum,w)=>sum+w.stats[mode].expectancyR*w.stats[mode].n,0);
-    const positivePairs=subset.filter(w=>w.stats[mode].n&&w.stats[mode].net>0).length;
-    const carry=subset.reduce((sum,w)=>sum+w.carryIn,0),cross=subset.reduce((sum,w)=>sum+w.cutCrossers,0);
-    btResultLine('WALK-FORWARD · BLOQUE '+(fold+1)+'/5 · '+label+' · '+n+' ops · E neta '+(n?fmt(r/n,3):'N/D')+'R · pares netos positivos '+positivePairs+'/'+subset.length+' · entradas arrastradas '+carry+' · cruces de ventana excluidos '+cross+'.');
-    if(n<100)btResultLine('WALK-FORWARD · BLOQUE '+(fold+1)+'/5 · muestra agregada menor a 100 operaciones: evidencia todavía corta.');
-   }
-  }
-  btResultLine('SENSIBILIDAD DE COSTOS: se congelan señales, timestamps, cantidad y niveles SL/TP originales; solo se reprecian fills de entrada/salida y comisiones. No se recalculan filtros ni tamaño de posición. Promedio de R ponderado por operación; no es una simulación de cartera.');
-  for(const multiple of [1.5,2]){
-   const aggregate={original:{n:0,r:0,positivePairs:0},breakEven:{n:0,r:0,positivePairs:0},partial:{n:0,r:0,positivePairs:0}};
-   for(const x of ok){
-    const stressedTrades=rangeMatchedCostTrades(x.lastTrades,settings,multiple);
-    const stressedSettings={...settings,fee:settings.fee*multiple,slippage:settings.slippage*multiple};
-    const result=rangeMatchedExitStats(stressedTrades,x.lastRows,stressedSettings);
-    for(const mode of ['original','breakEven','partial']){
-     const a=aggregate[mode],v=result[mode];a.n+=v.n;a.r+=v.expectancyR*v.n;if(v.n&&v.net>0)a.positivePairs++;
-    }
-   }
-   for(const [mode,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
-    const a=aggregate[mode];
-    btResultLine('COSTOS '+multiple+'× · ÚLTIMO 30% · '+label+' · '+a.n+' operaciones · E neta '+(a.n?fmt(a.r/a.n,3):'N/D')+'R · pares con neto positivo '+a.positivePairs+'/'+ok.length+'.');
-   }
-  }
-  btResultLine('INFERENCIA EMPAREJADA · bootstrap por bloques móviles de días UTC; conserva juntas las operaciones de todos los pares del mismo día para respetar parte de la dependencia temporal y la correlación entre activos. Intervalos percentiles 95%; no eliminan sesgo de selección ni sustituyen prueba futura.'); 
-  for(const blockDays of [3,7,14]){
-   const inference=rangePairedBlockBootstrap(ok.map(x=>({pair:x.pair,original:x.last.original,breakEven:x.last.breakEven,partial:x.last.partial})),blockDays,2000,20261112+blockDays);
-   if(!inference.available){btResultLine('BOOTSTRAP '+blockDays+' días: no disponible · '+inference.reason+'.');continue;}
-   for(const [key,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
-    const m=inference.metrics[key];
-    btResultLine('BOOTSTRAP '+blockDays+'d · '+label+' · E '+fmt(m.mean,3)+'R · IC95% ['+fmt(m.lower95,3)+'R, '+fmt(m.upper95,3)+'R] · P(E>0) bootstrap '+fmt(m.bootstrapPositiveProbability*100,1)+'% · '+inference.trades+' operaciones / '+inference.calendarDays+' días.');
-   }
-   for(const [key,label] of [['breakEvenMinusOriginal','EQUILIBRIO − ORIGINAL'],['partialMinusOriginal','PARCIAL − ORIGINAL']]){
-    const m=inference.metrics[key];
-    btResultLine('DIFERENCIA EMPAREJADA '+blockDays+'d · '+label+' · ΔE '+fmt(m.mean,3)+'R · IC95% ['+fmt(m.lower95,3)+'R, '+fmt(m.upper95,3)+'R]. Si el intervalo incluye 0, no hay evidencia clara de superioridad.');
-   }
-  }
-  for(const x of ok){
-   const wfText=x.walkForward.map(w=>'F'+w.fold+': '+w.n+' ops; arrastradas '+w.carryIn+'; cruces '+w.cutCrossers+
-    '; O '+fmt(w.stats.original.expectancyR,3)+'R/DD '+fmt(w.stats.original.maxDD,2)+'%'+
-    '; E '+fmt(w.stats.breakEven.expectancyR,3)+'R/DD '+fmt(w.stats.breakEven.maxDD,2)+'%'+
-    '; P '+fmt(w.stats.partial.expectancyR,3)+'R/DD '+fmt(w.stats.partial.maxDD,2)+'%').join(' | ');
-   btResultLine(x.pair+' · WALK-FORWARD (DD local por pliegue; arrastradas y cruces excluidos del conteo) · '+wfText+'.');
-   for(const c of x.costStress){
-    btResultLine(x.pair+' · COSTOS '+fmt(c.multiple,1)+'x sobre ÚLTIMO 30% · ORIGINAL '+fmtStat(c.stats.original)+
-     ' · EQUILIBRIO '+fmtStat(c.stats.breakEven)+' · PARCIAL '+fmtStat(c.stats.partial)+'.');
-   }
-  }
-  for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
-  const enough=completed.filter(r=>r.train.count>=20&&r.test.count>=20);
-  const bothProfitable=enough.filter(r=>r.train.net>0&&r.test.net>0);
-  const lastPositive=completed.filter(r=>r.test.net>0);
-  btResultLine('RESUMEN MULTI-CRIPTO: '+completed.length+'/'+pairs.length+' pares procesados · '+failed.length+' errores · '+lastPositive.length+'/'+completed.length+' pares positivos en último 30% · '+enough.length+' con 20+ operaciones por período · '+bothProfitable.length+'/'+enough.length+' positivos en ambos períodos.');
+  btResultLine('Este diagnóstico de 30 días compara el bloque inicial y el final; la auditoría emparejada de 180 días, sus costos y su walk-forward se ejecutan en el panel independiente de tres salidas.');
   btResultLine('RANGO ORIGINAL: después de cada Stop Loss se observan los dos siguientes cierres de 1h respecto de los límites originales. Es un diagnóstico retrospectivo, no modifica órdenes ni predice rupturas.');
   btResultLine('AUDITORÍA DE RUPTURAS: el SL está al 6% del ancho fuera del rango, y la confirmación de ruptura requiere cierre horario al 15% fuera. Es normal que el SL se active antes; cero cierres por ruptura no implica que la protección esté inactiva.');
   btResultLine('Los resultados de diferentes criptos NO se suman como una cartera real. No se modelan posiciones simultáneas ni correlación; pruebas exploratorias, sin dinero real.');
@@ -2085,8 +2028,8 @@ function rangeWalkForwardWindows(rows,trainDays=30,foldDays=30,interval=300000){
  }
  return out;
 }
-function rangePairedBlockBootstrap(pairStats,blockDays=7,reps=2000,seed=20261112){
- if(!Number.isInteger(blockDays)||blockDays<1||!Number.isInteger(reps)||reps<200)throw Error('Invalid bootstrap settings');
+function rangePairedBlockBootstrap(pairStats,blockDays=7,reps=2000,seed=20261112,minEffectiveBlocks=10){
+ if(!Number.isInteger(blockDays)||blockDays<1||!Number.isInteger(reps)||reps<200||!Number.isFinite(minEffectiveBlocks)||minEffectiveBlocks<2)throw Error('Invalid bootstrap settings');
  const byDay=new Map();
  for(const p of pairStats){
   const o=p.original?.samples||[],b=p.breakEven?.samples||[],q=p.partial?.samples||[];
@@ -2100,8 +2043,8 @@ function rangePairedBlockBootstrap(pairStats,blockDays=7,reps=2000,seed=20261112
  }
  const days=[...byDay.keys()].sort((a,b)=>a-b);
  if(!days.length)return {available:false,reason:'No matched OOS trades'};
- const first=days[0],span=days.at(-1)-first+1;
- if(span<blockDays*2)return {available:false,reason:'Too few calendar days for block length '+blockDays};
+ const first=days[0],span=days.at(-1)-first+1,effectiveBlocks=span/blockDays;
+ if(effectiveBlocks<minEffectiveBlocks)return {available:false,reason:'Only '+effectiveBlocks.toFixed(1)+' block-equivalents; at least '+minEffectiveBlocks+' required',effectiveBlocks,activeDays:days.length,calendarDays:span};
  const calendar=Array.from({length:span},(_,i)=>byDay.get(first+i)||[]);
  let state=(seed>>>0)||1;
  const random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296};
@@ -2131,7 +2074,7 @@ function rangePairedBlockBootstrap(pairStats,blockDays=7,reps=2000,seed=20261112
   for(const k of [...names,...diffs])if(sums[k].n)values[k].push(sums[k].sum/sums[k].n);
  }
  const quantile=(arr,p)=>{const x=[...arr].sort((a,b)=>a-b),i=(x.length-1)*p,lo=Math.floor(i),hi=Math.ceil(i);return x[lo]+(x[hi]-x[lo])*(i-lo)};
- const result={available:true,blockDays,reps,calendarDays:span,trades:point.original.n,metrics:{}};
+ const result={available:true,blockDays,reps,calendarDays:span,activeDays:days.length,effectiveBlocks,trades:point.original.n,weighting:'pooled per trade across available pairs',metrics:{}};
  for(const k of [...names,...diffs]){
   const arr=values[k],mean=point[k].n?point[k].sum/point[k].n:0;
   result.metrics[k]={mean,lower95:arr.length?quantile(arr,.025):null,upper95:arr.length?quantile(arr,.975):null,bootstrapPositiveProbability:arr.length?arr.filter(x=>x>0).length/arr.length:null};
@@ -2210,6 +2153,19 @@ async function runRangeMatchedExitMulti(){
    for(const [label,v] of [['PRIMER 70%',x.first],['ÚLTIMO 30%',x.last]]){
     btResultLine(x.pair+' · '+label+' · ORIGINAL '+fmtStat(v.original)+' · EQUILIBRIO '+fmtStat(v.breakEven)+' · PARCIAL '+fmtStat(v.partial)+'.');
     if(v.original.n<100)btResultLine(x.pair+' · '+label+' · menos de 100 operaciones: muestra corta; no elegir una salida con este bloque.');
+   }
+  }
+  btResultLine('INFERENCIA EMPAREJADA · bootstrap móvil por bloques de días UTC, operaciones de todos los pares del mismo día juntas. Expectativa agrupada ponderada por operación, no cartera ejecutable ni promedio igual por par. IC percentiles 95%; no corrigen selección retrospectiva ni sustituyen datos futuros.');
+  for(const blockDays of [3,7,14]){
+   const inference=rangePairedBlockBootstrap(ok.map(x=>({pair:x.pair,original:x.last.original,breakEven:x.last.breakEven,partial:x.last.partial})),blockDays,2000,20261113+blockDays,10);
+   if(!inference.available){btResultLine('BOOTSTRAP '+blockDays+'d · IC NO CALCULADO · '+inference.reason+' · '+(inference.activeDays??'N/D')+' días activos.');continue;}
+   for(const [key,label] of [['original','ORIGINAL'],['breakEven','EQUILIBRIO'],['partial','PARCIAL']]){
+    const m=inference.metrics[key];
+    btResultLine('BOOTSTRAP '+blockDays+'d · '+label+' · E '+fmt(m.mean,3)+'R · IC95% ['+fmt(m.lower95,3)+'R, '+fmt(m.upper95,3)+'R] · P(E>0) bootstrap '+fmt(m.bootstrapPositiveProbability*100,1)+'% · '+inference.trades+' ops · '+inference.activeDays+'/'+inference.calendarDays+' días activos/calendario · '+fmt(inference.effectiveBlocks,1)+' bloques equivalentes.');
+   }
+   for(const [key,label] of [['breakEvenMinusOriginal','EQUILIBRIO − ORIGINAL'],['partialMinusOriginal','PARCIAL − ORIGINAL']]){
+    const m=inference.metrics[key];
+    btResultLine('DIFERENCIA EMPAREJADA '+blockDays+'d · '+label+' · ΔE '+fmt(m.mean,3)+'R · IC95% ['+fmt(m.lower95,3)+'R, '+fmt(m.upper95,3)+'R]. Intervalo que incluye 0: superioridad no demostrada.');
    }
   }
   for(const f of failed)btResultLine('SIN RESULTADO '+f.pair+': '+f.error);
