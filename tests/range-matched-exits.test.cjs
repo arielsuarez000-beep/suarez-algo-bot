@@ -246,7 +246,7 @@ const trade = (overrides = {}) => ({
   const helperEnd=html.indexOf('\nfunction rangeMatchedExitStats',helperStart);
   assert(helperStart>=0&&helperEnd>helperStart,'paired block bootstrap helper must exist');
   const bootstrap=vm.runInNewContext('('+html.slice(helperStart,helperEnd)+')',{Math,Number,Array,Map,Object});
-  const samples=Array.from({length:28},(_,i)=>({time:i*86400000,r:(i%5-2)*0.03}));
+  const samples=Array.from({length:70},(_,i)=>({time:i*86400000,r:(i%5-2)*0.03}));
   const pairStats=[{
     pair:'TESTUSDT',
     original:{samples},
@@ -263,9 +263,30 @@ const trade = (overrides = {}) => ({
   assert.ok(Math.abs(a.metrics.breakEvenMinusOriginal.lower95+0.2)<1e-12&&
     Math.abs(a.metrics.breakEvenMinusOriginal.upper95+0.2)<1e-12,
     'block bootstrap must retain a constant paired treatment effect');
-  assert.equal(a.trades,28);
+  assert.equal(a.trades,70);
+  assert.equal(a.effectiveBlocks,10);
+  assert.equal(a.activeDays,70);
+  assert.equal(bootstrap(pairStats,7,500,12345,10).available,true);
+  const shortSamples=samples.slice(0,28);
+  assert.equal(bootstrap([{pair:'SHORT',original:{samples:shortSamples},breakEven:{samples:shortSamples},partial:{samples:shortSamples}}],7,500,1,10).available,false,
+    'short calendar histories must not emit apparently precise bootstrap intervals');
   assert.throws(()=>bootstrap([{pair:'BAD',original:{samples},breakEven:{samples:samples.slice(1)},partial:{samples}}],7,500,1),
     /Matched sample counts differ/,'unmatched exit samples must be rejected');
+}
+
+{
+  const hourlyStart=html.indexOf('async function runRangeHourlyMulti()');
+  const hourlyEnd=html.indexOf("\n$('btHourlyMulti').onclick",hourlyStart);
+  const matchedStart=html.indexOf('async function runRangeMatchedExitMulti()');
+  const matchedEnd=html.indexOf("\n$('btCompareExits').onclick",matchedStart);
+  assert(hourlyStart>=0&&hourlyEnd>hourlyStart&&matchedStart>=0&&matchedEnd>matchedStart,
+    'diagnostic runner boundaries must exist');
+  const hourlyRunner=html.slice(hourlyStart,hourlyEnd);
+  const matchedRunner=html.slice(matchedStart,matchedEnd);
+  assert.doesNotMatch(hourlyRunner,/rangePairedBlockBootstrap|INFERENCIA EMPAREJADA|\bok\.map\(/,
+    'the 30-day hourly diagnostic must not contain matched-exit reporting or undefined ok references');
+  assert.match(matchedRunner,/rangePairedBlockBootstrap\(ok\.map/,
+    'bootstrap inference must be inside the 180-day matched-exit runner');
 }
 
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
