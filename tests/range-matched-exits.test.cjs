@@ -63,6 +63,25 @@ const trade = (overrides = {}) => ({
 }
 {
   const rows = [
+    candle(0,100,101,99,100), candle(1,100,125,89,100)
+  ];
+  const result = run(trade({date:1,exit:90,reason:'SL'}), rows, settings, 'breakEven');
+  assert.equal(result.net, -10, 'dual-touch realized P&L must still use stop-first execution');
+  assert.ok(result.maxDD > 27.9 && result.maxDD < 28.1,
+    'terminal dual-touch DD must include the favorable extreme before the stop as a conservative bound');
+}
+{
+  const rows = [
+    candle(0,100,111,99,110), candle(1,101,121,99,105),
+    candle(2,105,110,104,108)
+  ];
+  const result = run(trade({date:2,exit:105,reason:'RANGE BREAK',pnl:5}), rows, settings, 'breakEven');
+  assert.equal(result.net, 0, 'an armed break-even stop must retain its realized stop-first fill');
+  assert.ok(result.maxDD > 17.3 && result.maxDD < 17.4,
+    'non-terminal dual-touch DD must include the favorable extreme before the break-even stop');
+}
+{
+  const rows = [
     candle(0,100,101,99,100), candle(1,100,110,99,105),
     candle(2,95,121,94,100)
   ];
