@@ -2043,9 +2043,13 @@ function rangePairedBlockBootstrap(pairStats,blockDays=7,reps=2000,seed=20261112
  }
  const days=[...byDay.keys()].sort((a,b)=>a-b);
  if(!days.length)return {available:false,reason:'No matched OOS trades'};
- const first=days[0],span=days.at(-1)-first+1,effectiveBlocks=span/blockDays;
- if(effectiveBlocks<minEffectiveBlocks)return {available:false,reason:'Only '+effectiveBlocks.toFixed(1)+' block-equivalents; at least '+minEffectiveBlocks+' required',effectiveBlocks,activeDays:days.length,calendarDays:span};
+ const first=days[0],span=days.at(-1)-first+1;
  const calendar=Array.from({length:span},(_,i)=>byDay.get(first+i)||[]);
+ // Count non-empty, non-overlapping UTC calendar blocks, not merely elapsed calendar time.
+ // Sparse trades clustered into a few periods must not manufacture bootstrap sample size.
+ let effectiveBlocks=0;
+ for(let i=0;i<span;i+=blockDays){if(calendar.slice(i,i+blockDays).some(day=>day.length))effectiveBlocks++;}
+ if(effectiveBlocks<minEffectiveBlocks)return {available:false,reason:'Only '+effectiveBlocks+' non-empty calendar blocks; at least '+minEffectiveBlocks+' required',effectiveBlocks,activeDays:days.length,calendarDays:span};
  let state=(seed>>>0)||1;
  const random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296};
  const names=['original','breakEven','partial'];
