@@ -1947,10 +1947,10 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
   if(last&&(mode==='original'||(mode==='partial'&&!partial)||(mode==='breakEven'&&!armed))){
    if(hitStop&&hitTarget){
     if(!openBeyondTarget){
-    markAt(b.o);
-    // For drawdown only, include the favorable extreme before the stop as an OHLC upper bound.
-    markAt(sign===1?b.h:b.l);
-   }
+     markAt(b.o);
+     // For drawdown only, include the favorable extreme before the stop as an OHLC upper bound.
+     markAt(sign===1?b.h:b.l);
+    }
    }else if(hitStop){
     markAt(b.o);
     markAt(sign===1?b.h:b.l);
