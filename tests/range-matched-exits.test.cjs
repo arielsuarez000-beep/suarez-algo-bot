@@ -278,6 +278,13 @@ const trade = (overrides = {}) => ({
   const shortSamples=samples.slice(0,28);
   assert.equal(bootstrap([{pair:'SHORT',original:{samples:shortSamples},breakEven:{samples:shortSamples},partial:{samples:shortSamples}}],7,500,1,10).available,false,
     'short calendar histories must not emit apparently precise bootstrap intervals');
+  const sparseDays=[0,1,2,51,52,53].flatMap(day=>Array.from({length:2},(_,i)=>({time:(day*86400000)+i*3600000,r:0.01})));
+  const sparsePair=[{pair:'SPARSE',original:{samples:sparseDays},breakEven:{samples:sparseDays},partial:{samples:sparseDays}}];
+  const sparseResult=bootstrap(sparsePair,3,500,1,10);
+  assert.equal(sparseResult.available,false,
+    '54 calendar days with trades clustered into only two 3-day blocks must be rejected');
+  assert.equal(sparseResult.effectiveBlocks,2,
+    'effective bootstrap blocks must count non-empty non-overlapping calendar blocks, not elapsed days');
   assert.throws(()=>bootstrap([{pair:'BAD',original:{samples},breakEven:{samples:samples.slice(1)},partial:{samples}}],7,500,1),
     /Matched sample counts differ/,'unmatched exit samples must be rejected');
 }
