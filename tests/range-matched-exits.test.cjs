@@ -7,11 +7,15 @@ const inlineScripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)
   .map(match => match[1]).filter(source => source.trim());
 assert(inlineScripts.length > 0, 'index.html must contain an inline script');
 for (const source of inlineScripts) new vm.Script(source);
+const decisionStart = html.indexOf('function rangeMatchedBarExit(');
+const decisionEnd = html.indexOf('\nfunction backtestRangeHourly', decisionStart);
+assert(decisionStart >= 0 && decisionEnd > decisionStart, 'rangeMatchedBarExit must exist in index.html');
+const decide = vm.runInNewContext('(' + html.slice(decisionStart, decisionEnd) + ')', {});
 const start = html.indexOf('function rangeMatchedExit(');
 const end = html.indexOf('\nfunction rangeMatchedCostTrades', start);
 assert(start >= 0 && end > start, 'rangeMatchedExit must exist in index.html');
 const source = html.slice(start, end);
-const run = vm.runInNewContext('(' + source + ')', {});
+const run = vm.runInNewContext('(' + source + ')', {rangeMatchedBarExit: decide});
 const costStart = html.indexOf('function rangeMatchedCostTrades(');
 const costEnd = html.indexOf('\nfunction rangeWalkForwardWindows', costStart);
 assert(costStart >= 0 && costEnd > costStart, 'rangeMatchedCostTrades must exist');
@@ -25,6 +29,33 @@ const trade = (overrides = {}) => ({
 });
 
 {
+  const longGap = decide('LONG', candle(1,125,130,89,100), 90, 120);
+  assert.equal(longGap.reason, 'TP');
+  assert.equal(longGap.price, 120, 'a long TP crossed at the open fills at the target, not at a later stop');
+  assert.equal(longGap.gap, true);
+  const shortGap = decide('SHORT', candle(1,75,111,70,80), 110, 80);
+  assert.equal(shortGap.reason, 'TP');
+  assert.equal(shortGap.price, 80, 'a short TP crossed at the open fills at the target, not at a later stop');
+  const adverseGap = decide('LONG', candle(1,85,125,80,100), 90, 120);
+  assert.equal(adverseGap.reason, 'SL');
+  assert.equal(adverseGap.price, 85, 'an adverse stop gap fills at the opening price');
+  const ambiguous = decide('LONG', candle(1,100,125,89,100), 90, 120);
+  assert.equal(ambiguous.reason, 'SL');
+  assert.equal(ambiguous.dual, true, 'only a dual touch after an open between levels uses SL-first');
+}
+
+{
+  const runnerStart = html.indexOf('function backtestRangeHourly(');
+  const runnerEnd = html.indexOf('\nfunction rangeShowStats', runnerStart);
+  assert(runnerStart >= 0 && runnerEnd > runnerStart, 'range hourly backtest must exist');
+  const runner = html.slice(runnerStart, runnerEnd);
+  assert.match(runner, /rangeMatchedBarExit\(open\.side,bar,open\.stop,open\.take\)/,
+    'baseline backtest must share the gap-aware fill decision');
+  assert.match(runner, /rangeMatchedBarExit\(open\.side,bar,stop,take\)/,
+    'entry-candle fills must use the same execution decision');
+}
+
+{
   const rows = [
     candle(0,100,101,99,100), candle(1,100,112,99,110),
     candle(2,105,111,104,109), candle(3,108,121,107,120)
@@ -35,14 +66,12 @@ const trade = (overrides = {}) => ({
 }
 {
   const rows = [
-    candle(0,100,101,99,100), candle(1,110,112,110,110),
+    candle(0,100,101,99,100), candle(1,100,112,99,110),
     candle(2,125,126,89,100)
   ];
-  const result = run(trade({date:2,exit:90,reason:'SL',pnl:-10}), rows, settings, 'partial');
-  assert.equal(result.net, 7.5,
-    'partial half should fill at the next open while the remaining half keeps stop-first handling');
-  assert.ok(result.maxDD > 4.4 && result.maxDD < 4.5,
-    'realized partial profit must enter the drawdown high-water path before the remaining stop');
+  const result = run(trade({date:2,exit:120,reason:'TP',pnl:20}), rows, settings, 'partial');
+  assert.equal(result.net, 22.5,
+    'partial sells half at the next open and the remaining half fills its TP already crossed at that open');
 }
 {
   const rows = [
@@ -55,18 +84,30 @@ const trade = (overrides = {}) => ({
 }
 {
   const rows = [
-    candle(0,100,101,99,100), candle(1,125,126,89,100),
-    candle(2,100,101,99,100)
+    candle(0,100,101,99,100), candle(1,100,112,99,110),
+    candle(2,125,126,89,100)
   ];
-  const result = run(trade({ date:2, exit:90, reason:'SL' }), rows, settings, 'breakEven');
-  assert.equal(result.net, -10, 'when SL and TP touch in one candle, conservative priority is SL');
+  const result = run(trade({date:2,exit:120,reason:'TP',pnl:20}), rows, settings, 'breakEven');
+  assert.equal(result.net, 20,
+    'after +1R confirmation, an opening gap through TP exits at TP before a later intrabar stop');
+  assert.equal(result.protected, true);
+}
+{
+  const rows = [
+    candle(0,100,101,99,100), candle(1,100,101,88,90),
+    candle(2,75,111,70,80)
+  ];
+  const short = trade({side:'SHORT',entry:100,stop:110,take:80,date:2,exit:80,reason:'TP',pnl:20});
+  const result = run(short, rows, settings, 'breakEven');
+  assert.equal(result.net, 20,
+    'short break-even replay must also honor a favorable opening gap through TP');
 }
 {
   const rows = [
     candle(0,100,101,99,100), candle(1,100,125,89,100)
   ];
   const result = run(trade({date:1,exit:90,reason:'SL'}), rows, settings, 'breakEven');
-  assert.equal(result.net, -10, 'dual-touch realized P&L must still use stop-first execution');
+  assert.equal(result.net, -10, 'dual-touch with an opening price between SL and TP must still use stop-first execution');
   assert.ok(result.maxDD > 27.9 && result.maxDD < 28.1,
     'terminal dual-touch DD must include the favorable extreme before the stop as a conservative bound');
 }

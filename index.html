@@ -1244,6 +1244,20 @@ function rangeFindZone1h(closed60,requireSideways=false){
  return {low,high,width,mid,end:closed60.at(-1).end};
 }
 
+// Resolve opening gaps before intrabar ambiguity. A resting TP already crossed
+// at the open is filled at the target (no price improvement); otherwise, if
+// both levels are touched inside the candle, retain conservative SL-first.
+function rangeMatchedBarExit(side,bar,stop,take){
+ const sign=side==='LONG'?1:-1;
+ if(sign*(bar.o-stop)<=0)return {price:bar.o,reason:'SL',gap:true,dual:false};
+ if(sign*(bar.o-take)>=0)return {price:take,reason:'TP',gap:true,dual:false};
+ const hitStop=sign===1?bar.l<=stop:bar.h>=stop;
+ const hitTarget=sign===1?bar.h>=take:bar.l<=take;
+ if(hitStop)return {price:stop,reason:'SL',gap:false,dual:hitTarget};
+ if(hitTarget)return {price:take,reason:'TP',gap:false,dual:false};
+ return null;
+}
+
 function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=false,protectRange=false,sidewaysOnly=false,centerProgress=false,entryStartTime=0){
  const {capital,margin,leverage,riskPct,fee,slippage}=options,rate=slippage/100,closed60=rangeAggregate1h(rows);
  let balance=capital,peak=capital,dd=0,open=null,trades=[],zones=0,signals=0,blocked=0,lastClose=-9999,rearmed=true;
@@ -1300,11 +1314,10 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
    if(confirmedBreak){
     close(open,bar.o,'RANGE BREAK',bar,i);
    }else{
-    const sl=long?bar.l<=open.stop:bar.h>=open.stop,tp=long?bar.h>=open.take:bar.l<=open.take;
-    if(sl||tp){
-     if(sl&&!newHourClose)stats.stopBeforeHourlyClose++;
-     const gap=sl&&(long?bar.o<open.stop:bar.o>open.stop);
-     close(open,sl?(gap?bar.o:open.stop):open.take,sl?'SL':'TP',bar,i);
+    const fill=rangeMatchedBarExit(open.side,bar,open.stop,open.take);
+    if(fill){
+     if(fill.reason==='SL'&&!newHourClose)stats.stopBeforeHourlyClose++;
+     close(open,fill.price,fill.reason,bar,i);
     }else{
      // Candle completed with the position still open: both extremes occurred.
      open.maxFav=Math.max(open.maxFav||0,long?bar.h-open.entry:open.entry-bar.l,0);
@@ -1379,11 +1392,8 @@ function backtestRangeHourly(rows,options,stopBuffer=0.06,confirmNextCandle=fals
   const qty=used*leverage/entry;
   open={side:long?'LONG':'SHORT',entry,stop,take,qty,risk:risk*qty,entryTime:bar.t,low,high,maxFav:0,maxAdv:0};
   rearmed=false;
-  const sl=long?bar.l<=stop:bar.h>=stop,tp=long?bar.h>=take:bar.l<=take;
-  if(sl||tp){
-   const gap=sl&&(long?bar.o<stop:bar.o>stop);
-   close(open,sl?(gap?bar.o:stop):take,sl?'SL':'TP',bar,i);
-  }
+  const fill=rangeMatchedBarExit(open.side,bar,stop,take);
+  if(fill)close(open,fill.price,fill.reason,bar,i);
  }
  stats.pendingStopChecks=pendingBreakChecks.length;
  const wins=trades.filter(t=>t.pnl>0).length,profit=trades.reduce((n,t)=>n+Math.max(0,t.pnl),0),loss=trades.reduce((n,t)=>n+Math.max(0,-t.pnl),0);
@@ -1930,7 +1940,7 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
    return finish(trade.reason);
   }
   const stop=mode==='breakEven'&&armed?be:trade.stop;
-  // Adverse opening gaps execute at the open before a scheduled partial.
+  // An adverse opening gap closes the full remaining position before any partial.
   if(sign*(b.o-stop)<=0){
    exit(b.o,remaining);
    return finish('SL/GAP');
@@ -1940,6 +1950,7 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
    partial=true;
    protectedAt=true;
   }
+  const fill=rangeMatchedBarExit(trade.side,b,stop,trade.take);
   const hitStop=sign===1?b.l<=stop:b.h>=stop;
   const hitTarget=sign===1?b.h>=trade.take:b.l<=trade.take;
   const openBeyondTarget=sign*(b.o-trade.take)>=0;
@@ -1967,33 +1978,25 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
    exit(trade.exit,remaining,true);
    return finish(trade.reason);
   }
-  if(hitStop&&hitTarget){
-   // OHLC cannot reveal the order. Match the baseline's conservative stop-first rule.
-   // If the open itself is beyond target, do not credit that price as an unrealized peak.
-   if(!openBeyondTarget){
-    markAt(b.o);
-    // For drawdown only, include the favorable extreme before the stop as an OHLC upper bound.
-    markAt(sign===1?b.h:b.l);
+  if(fill){
+   if(fill.reason==='SL'){
+    if(!fill.gap){
+     // For intrabar stops, bound drawdown with favorable excursion before the stop.
+     markAt(b.o);
+     markAt(sign===1?b.h:b.l);
+    }
+    exit(fill.price,remaining);
+    return finish(fill.gap?'SL/GAP':'SL');
    }
-   exit(stop,remaining);
-   return finish('SL');
-  }
-  if(hitStop){
-   // With no target touch, the favorable extreme may precede the stop; use that
-   // worst-case ordering for the intratrade drawdown envelope.
-   markAt(b.o);
-   markAt(sign===1?b.h:b.l);
-   exit(stop,remaining);
-   return finish('SL');
-  }
-  if(hitTarget){
-   // On a favorable opening gap, keep the baseline's conservative target-price fill.
-   if(!openBeyondTarget){
-    markAt(b.o);
-    markAt(sign===1?b.l:b.h);
+   if(fill.reason==='TP'){
+    if(!fill.gap){
+     // With an intrabar TP, include the adverse extreme before the target fill.
+     markAt(b.o);
+     markAt(sign===1?b.l:b.h);
+    }
+    exit(fill.price,remaining);
+    return finish(fill.gap?'TP/GAP':'TP');
    }
-   exit(trade.take,remaining);
-   return finish('TP');
   }
   if(last){
    markAt(b.o);
