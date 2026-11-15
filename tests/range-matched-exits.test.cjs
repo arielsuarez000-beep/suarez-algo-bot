@@ -293,6 +293,8 @@ const trade = (overrides = {}) => ({
     'UI must display the walk-forward folds it computes');
   assert.match(historical,/ctx\.rangeWalkForwardWindows/,
     'standalone historical report must include walk-forward folds');
+  assert.match(historical,/['"]rangeMatchedBarExit['"]/,
+    'standalone historical audit must load the shared gap-aware fill helper');
   assert.match(historical,/ctx\.rangeMatchedCostTrades/,
     'standalone historical report must include cost stress');
   assert.match(historical,/errors\.push\(host\+/,

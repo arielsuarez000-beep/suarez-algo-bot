@@ -7,7 +7,7 @@ function fn(name){
  if(c==="'"||c==='"'||c==='`'){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return html.slice(start,i+1);}
  throw Error('Unclosed '+name);
 }
-const names=['rangeAggregate1h','rangeFindZone1h','backtestRangeHourly','rangeMatchedExit','rangeMatchedExitStats','rangeMatchedCostTrades','rangeWalkForwardWindows'];
+const names=['rangeAggregate1h','rangeFindZone1h','rangeMatchedBarExit','backtestRangeHourly','rangeMatchedExit','rangeMatchedExitStats','rangeMatchedCostTrades','rangeWalkForwardWindows'];
 const ctx={console,Error,Math,Number,Array,Map,Object,$:()=>({value:'5'})};vm.createContext(ctx);
 vm.runInContext(names.map(fn).join('\n'),ctx);
 const pairs=['BTCUSDT','ETHUSDT','SOLUSDT','1000PEPEUSDT','TAOUSDT','NEARUSDT','AVAXUSDT','DOGEUSDT','LINKUSDT','ARBUSDT'];
