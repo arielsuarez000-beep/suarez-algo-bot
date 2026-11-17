@@ -68,8 +68,10 @@ function summarize(trades,rows,from,activeSettings=settings,precomputed=null){co
  console.log('OK');
  }catch(e){failed.push({pair,error:String(e.message||e)});console.log('ERROR '+(e.message||e));}}
  const pairedBootstrap=[3,7,14].map(blockDays=>ctx.rangePairedBlockBootstrap(pairedOos,blockDays,2000,20261113+blockDays,10));
+ const pairedBootstrapPairs=pairedOos.filter(p=>p.original.samples.length>0).length;
+ const pairedBootstrapTrades=pairedOos.reduce((n,p)=>n+p.original.samples.length,0);
  const report={createdAt:new Date().toISOString(),asOf:new Date(auditNow).toISOString(),lookbackDays:180,interval:'5m',pairs,settings,results:out,failures:failed,
- pairedBootstrapPairs:pairedOos.length,pairedBootstrap,
+ pairedBootstrapPairs,pairedBootstrapTrades,pairedBootstrap,
  validationProtocol:{train:'Primer 70% cronológico',oos:'Último 30% cronológico; 240 velas previas solo para calentar, sin entradas antes del corte',walkForward:'30 días iniciales no puntuados + cinco pliegues cronológicos de 30 días; DD reiniciado por pliegue; entradas arrastradas y cruces de límite se informan y excluyen del conteo del pliegue',costStress:'1.5x y 2x comisión/slippage sobre las mismas operaciones OOS; señales, timestamps, qty y SL/TP congelados',pairedBootstrap:'Bootstrap pareado por bloques UTC de 3, 7 y 14 días; todas las operaciones de todos los pares del mismo día permanecen juntas; mínimo 10 bloques no vacíos',minimumTrades:100},
  limitations:['Matched exits replay identical baseline entries; not a full portfolio simulation.','No funding, order-book depth, liquidation, market impact, or actual fills. Slippage is a scenario assumption, not measured execution.','Walk-forward folds are historical diagnostics and overlap the 70/30 split; they are not a future unseen test.','Fold drawdown is local to each fold; carry-in positions and boundary-crossing trades are counted separately, not included in fold trade statistics.','Bootstrap intervals pool trades across the available fixed pairs and do not establish future performance or correct retrospective selection.','The final 30% has already been observable historically; a genuinely future paper/shadow test is still required.']};
  fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/range-matched-exits-report.json',JSON.stringify(report,null,2));
