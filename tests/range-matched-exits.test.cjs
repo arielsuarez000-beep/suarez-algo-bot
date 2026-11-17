@@ -366,4 +366,18 @@ const trade = (overrides = {}) => ({
     'bootstrap inference must be inside the 180-day matched-exit runner');
 }
 
+{
+  const historical = fs.readFileSync('tests/range-matched-exits-historical.cjs','utf8');
+  assert.ok(historical.includes("'rangePairedBlockBootstrap'"),
+    'standalone historical audit must load paired block-bootstrap inference');
+  assert.ok(historical.includes('ctx.rangePairedBlockBootstrap(pairedOos,blockDays,2000,20261113+blockDays,10)'),
+    'standalone report must calculate paired 3/7/14-day bootstrap intervals');
+  assert.ok(historical.includes('const auditNow=Date.now()') && historical.includes('history(pair,auditNow)'),
+    'all pairs must share one frozen audit timestamp and OOS cutoff');
+  assert.ok(historical.includes('asOf:new Date(auditNow).toISOString()'),
+    'report must expose the frozen data as-of timestamp');
+  assert.ok(historical.includes('pairedBootstrapPairs:pairedOos.length,pairedBootstrap'),
+    'report must include paired inference and the number of pairs contributing');
+}
+
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
