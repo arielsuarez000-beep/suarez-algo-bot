@@ -376,7 +376,7 @@ const trade = (overrides = {}) => ({
     'all pairs must share one frozen audit timestamp and OOS cutoff');
   assert.ok(historical.includes('asOf:new Date(auditNow).toISOString()'),
     'report must expose the frozen data as-of timestamp');
-  assert.ok(historical.includes('pairedBootstrapPairs:pairedOos.length,pairedBootstrap'),
+  assert.ok(historical.includes('const pairedBootstrapPairs=pairedOos.filter(p=>p.original.samples.length>0).length') && historical.includes('pairedBootstrapPairs,pairedBootstrapTrades,pairedBootstrap'),
     'report must include paired inference and the number of pairs contributing');
 }
 
