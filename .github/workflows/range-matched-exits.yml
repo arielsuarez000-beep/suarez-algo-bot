@@ -31,5 +31,6 @@ jobs:
       - name: Verify historical audit script syntax
         run: node --check tests/range-matched-exits-historical.cjs
 
-
-# Bybit historical data is audited from the user's browser because GitHub-hosted runners receive HTTP 403.
+# Historical Bybit downloads are intentionally not run on GitHub-hosted runners:
+# the verified runner region returned HTTP 403 for both public Bybit API hosts.
+# Keep the standalone audit script for browser/permitted-network execution.
