@@ -4,10 +4,10 @@ function fn(name){
  const start=html.indexOf('function '+name+'('); if(start<0) throw Error('Missing '+name); if(name==='rangeMatchedExit'){const end=html.indexOf('function rangeMatchedExitStats',start);if(end<0)throw Error('Missing boundary');return html.slice(start,end);}
  let i=html.indexOf('{',start),depth=0,quote='',esc=false;
  for(;i<html.length;i++){const c=html[i];if(quote){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===quote)quote='';continue;}
- if(c==="'"||c==='"'||c==='`'){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return html.slice(start,i+1);}
+ if(c==="'"||c==='"'||c===String.fromCharCode(96)){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return html.slice(start,i+1);}
  throw Error('Unclosed '+name);
 }
-const names=['rangeAggregate1h','rangeFindZone1h','rangeMatchedBarExit','backtestRangeHourly','rangeMatchedExit','rangeMatchedExitStats','rangeMatchedCostTrades','rangeWalkForwardWindows'];
+const names=['rangeAggregate1h','rangeFindZone1h','rangeMatchedBarExit','backtestRangeHourly','rangeMatchedExit','rangeMatchedExitStats','rangeMatchedCostTrades','rangeWalkForwardWindows','rangePairedBlockBootstrap'];
 const ctx={console,Error,Math,Number,Array,Map,Object,$:()=>({value:'5'})};vm.createContext(ctx);
 vm.runInContext(names.map(fn).join('\n'),ctx);
 const pairs=['BTCUSDT','ETHUSDT','SOLUSDT','1000PEPEUSDT','TAOUSDT','NEARUSDT','AVAXUSDT','DOGEUSDT','LINKUSDT','ARBUSDT'];
@@ -33,19 +33,21 @@ async function page(pair,end){const errors=[];for(const host of hosts){const ac=
  const rows=j.result.list.map(x=>({t:+x[0],o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]})).filter(x=>[x.t,x.o,x.h,x.l,x.c,x.v].every(Number.isFinite));
  if(rows.length)return rows;throw Error('No candles');
  }catch(e){errors.push(host+': '+String(e.message||e));}finally{clearTimeout(timer);}}throw Error(errors.join(' | ')||'API failed');}
-async function history(pair){const now=Date.now(),start=now-days*86400000,buf=new Map();let cursor=now,n=0;
+async function history(pair,now){const start=now-days*86400000,buf=new Map();let cursor=now,n=0;
  while(cursor>=start&&n++<70){const a=await page(pair,cursor);let oldest=Infinity;for(const x of a){oldest=Math.min(oldest,x.t);if(x.t>=start&&x.t+step<=now)buf.set(x.t,x);}
  if(!Number.isFinite(oldest)||oldest>=cursor)throw Error('Pagination stalled');cursor=oldest-1;if(oldest<=start)break;if(a.length<200)throw Error('Short page');await new Promise(r=>setTimeout(r,150));}
  const rows=[...buf.values()].sort((a,b)=>a.t-b.t);validateHistoryCoverage(rows,start,now,step);return rows;}
-function summarize(trades,rows,from,activeSettings=settings){const chosen=trades.filter(t=>t.entryTime>=from),s=ctx.rangeMatchedExitStats(chosen,rows,activeSettings),o={};
+function summarize(trades,rows,from,activeSettings=settings,precomputed=null){const chosen=trades.filter(t=>t.entryTime>=from),s=precomputed||ctx.rangeMatchedExitStats(chosen,rows,activeSettings),o={};
  for(const k of ['original','breakEven','partial']){const x=s[k];o[k]={trades:x.n,net:+x.net.toFixed(5),winRate:+x.winRate.toFixed(2),expectancyR:+x.expectancyR.toFixed(4),stdR:+x.stdR.toFixed(4),seR:+x.seR.toFixed(4),PF:x.profitFactor===null?null:+x.profitFactor.toFixed(3),intratradeDD:+x.maxDD.toFixed(3),sampleSufficient:x.n>=100};}return o;}
-(async()=>{const out=[],failed=[];for(let i=0;i<pairs.length;i++){const pair=pairs[i];process.stdout.write((i+1)+'/10 '+pair+' ... ');try{
- const rows=await history(pair),cut=Math.floor(rows.length*.7),split=rows[cut].t,warm=240;
+(async()=>{const auditNow=Date.now(),out=[],failed=[],pairedOos=[];for(let i=0;i<pairs.length;i++){const pair=pairs[i];process.stdout.write((i+1)+'/10 '+pair+' ... ');try{
+ const rows=await history(pair,auditNow),cut=Math.floor(rows.length*.7),split=rows[cut].t,warm=240;
  const trainRows=rows.slice(0,cut),oosRows=rows.slice(Math.max(0,cut-warm));
  const a=ctx.backtestRangeHourly(trainRows,settings,.06,false,false,false,false);
  // Warm up the detector with prior candles, but prohibit all entries before the OOS cutoff.
  const b=ctx.backtestRangeHourly(oosRows,settings,.06,false,false,false,false,split);
  const oosTrades=b.trades.filter(t=>t.entryTime>=split);
+ const oosStats=ctx.rangeMatchedExitStats(oosTrades,oosRows,settings);
+ pairedOos.push({pair,original:oosStats.original,breakEven:oosStats.breakEven,partial:oosStats.partial});
  const full=ctx.backtestRangeHourly(rows,settings,.06,false,false,false,false);
  const walkForward=ctx.rangeWalkForwardWindows(rows,30,30,step).map(w=>{
   const foldTrades=full.trades.filter(t=>t.entryTime>=w.startTime&&t.entryTime<w.endTime&&t.date<w.endTime);
@@ -61,13 +63,15 @@ function summarize(trades,rows,from,activeSettings=settings){const chosen=trades
   return {multiple,stats:summarize(stressedTrades,oosRows,split,stressedSettings)};
  });
  out.push({pair,candles:rows.length,train:summarize(a.trades,trainRows,rows[0].t),
-  oos:summarize(oosTrades,oosRows,split),trainOpen:!!a.open,oosOpen:!!b.open,fullOpen:!!full.open,
+  oos:summarize(oosTrades,oosRows,split,settings,oosStats),trainOpen:!!a.open,oosOpen:!!b.open,fullOpen:!!full.open,
   walkForward,costStress});
  console.log('OK');
  }catch(e){failed.push({pair,error:String(e.message||e)});console.log('ERROR '+(e.message||e));}}
- const report={createdAt:new Date().toISOString(),lookbackDays:180,interval:'5m',pairs,settings,results:out,failures:failed,
- validationProtocol:{train:'Primer 70% cronológico',oos:'Último 30% cronológico; 240 velas previas solo para calentar, sin entradas antes del corte',walkForward:'30 días iniciales no puntuados + cinco pliegues cronológicos de 30 días; DD reiniciado por pliegue; entradas arrastradas y cruces de límite se informan y excluyen del conteo del pliegue',costStress:'1.5x y 2x comisión/slippage sobre las mismas operaciones OOS; señales, timestamps, qty y SL/TP congelados',minimumTrades:100},
- limitations:['Matched exits replay identical baseline entries; not a full portfolio simulation.','No funding, order-book depth, liquidation, market impact, or actual fills. Slippage is a scenario assumption, not measured execution.','Walk-forward folds are historical diagnostics and overlap the 70/30 split; they are not a future unseen test.','Fold drawdown is local to each fold; carry-in positions and boundary-crossing trades are counted separately, not included in fold trade statistics.','The final 30% has already been observable historically; a genuinely future paper/shadow test is still required.']};
+ const pairedBootstrap=[3,7,14].map(blockDays=>ctx.rangePairedBlockBootstrap(pairedOos,blockDays,2000,20261113+blockDays,10));
+ const report={createdAt:new Date().toISOString(),asOf:new Date(auditNow).toISOString(),lookbackDays:180,interval:'5m',pairs,settings,results:out,failures:failed,
+ pairedBootstrapPairs:pairedOos.length,pairedBootstrap,
+ validationProtocol:{train:'Primer 70% cronológico',oos:'Último 30% cronológico; 240 velas previas solo para calentar, sin entradas antes del corte',walkForward:'30 días iniciales no puntuados + cinco pliegues cronológicos de 30 días; DD reiniciado por pliegue; entradas arrastradas y cruces de límite se informan y excluyen del conteo del pliegue',costStress:'1.5x y 2x comisión/slippage sobre las mismas operaciones OOS; señales, timestamps, qty y SL/TP congelados',pairedBootstrap:'Bootstrap pareado por bloques UTC de 3, 7 y 14 días; todas las operaciones de todos los pares del mismo día permanecen juntas; mínimo 10 bloques no vacíos',minimumTrades:100},
+ limitations:['Matched exits replay identical baseline entries; not a full portfolio simulation.','No funding, order-book depth, liquidation, market impact, or actual fills. Slippage is a scenario assumption, not measured execution.','Walk-forward folds are historical diagnostics and overlap the 70/30 split; they are not a future unseen test.','Fold drawdown is local to each fold; carry-in positions and boundary-crossing trades are counted separately, not included in fold trade statistics.','Bootstrap intervals pool trades across the available fixed pairs and do not establish future performance or correct retrospective selection.','The final 30% has already been observable historically; a genuinely future paper/shadow test is still required.']};
  fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync('artifacts/range-matched-exits-report.json',JSON.stringify(report,null,2));
  console.log('DONE '+out.length+'/10 pairs; '+failed.length+' failures');if(out.length<8)process.exitCode=1;
 })().catch(e=>{console.error(e);process.exitCode=1;});
