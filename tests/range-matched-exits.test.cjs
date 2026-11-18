@@ -380,4 +380,27 @@ const trade = (overrides = {}) => ({
     'report must include paired inference and the number of pairs contributing');
 }
 
+{
+  const longRows = [
+    candle(0,100,101,99,100),
+    candle(1,85,125,80,100)
+  ];
+  const longGap = trade({date:1,exit:85,reason:'SL',pnl:-15});
+  for (const mode of ['original','breakEven','partial']) {
+    const result = run(longGap,longRows,settings,mode);
+    assert.ok(result.maxDD > 14.9 && result.maxDD < 15.1,
+      mode+' must not include favorable OHLC extremes after an adverse opening-gap stop');
+  }
+  const shortRows = [
+    candle(0,100,101,99,100),
+    candle(1,115,120,75,80)
+  ];
+  const shortGap = trade({side:'SHORT',entry:100,stop:110,take:80,date:1,exit:115,reason:'SL',pnl:-15});
+  for (const mode of ['original','breakEven','partial']) {
+    const result = run(shortGap,shortRows,settings,mode);
+    assert.ok(result.maxDD > 14.9 && result.maxDD < 15.1,
+      mode+' must not include favorable OHLC extremes after a short adverse opening-gap stop');
+  }
+}
+
 console.log('PASS: matched exits, stop-first ambiguity, range-break priority, and OHLC high-water drawdown');
