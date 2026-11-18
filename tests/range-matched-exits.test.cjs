@@ -375,6 +375,10 @@ const trade = (overrides = {}) => ({
   assert.ok(historical.includes('const auditNow=Date.now()') && historical.includes('history(pair,auditNow)'),
     'all pairs must share one frozen audit timestamp and OOS cutoff');
   assert.ok(historical.includes('asOf:new Date(auditNow).toISOString()'),
+  assert.ok(historical.includes('process.env.RANGE_AUDIT_DAYS||180'),
+    'standalone audit must keep the 180-day default while allowing a longer fixed-rule validation window');
+  assert.ok(historical.includes('maxPages=Math.ceil(expected/1000)+3') && historical.includes('n++<maxPages'),
+    'historical pagination must scale with the exact requested candle count instead of stopping at 70 pages');
     'report must expose the frozen data as-of timestamp');
   assert.ok(historical.includes('const pairedBootstrapPairs=pairedOos.filter(p=>p.original.samples.length>0).length') && historical.includes('pairedBootstrapPairs,pairedBootstrapTrades,pairedBootstrap'),
     'report must include paired inference and the number of pairs contributing');
