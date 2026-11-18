@@ -382,7 +382,7 @@ const trade = (overrides = {}) => ({
 
 {
   const longRows = [
-    candle(0,100,101,99,100),
+    candle(0,100,100,100,100),
     candle(1,85,125,80,100)
   ];
   const longGap = trade({date:1,exit:85,reason:'SL',pnl:-15});
@@ -392,7 +392,7 @@ const trade = (overrides = {}) => ({
       mode+' must not include favorable OHLC extremes after an adverse opening-gap stop');
   }
   const shortRows = [
-    candle(0,100,101,99,100),
+    candle(0,100,100,100,100),
     candle(1,115,120,75,80)
   ];
   const shortGap = trade({side:'SHORT',entry:100,stop:110,take:80,date:1,exit:115,reason:'SL',pnl:-15});
