@@ -1956,6 +1956,11 @@ function rangeMatchedExit(trade,rows,settings,mode,accountEquity=(Number.isFinit
   const openBeyondTarget=sign*(b.o-trade.take)>=0;
   // Preserve the original engine's terminal fill when no new protection was active.
   if(last&&(mode==='original'||(mode==='partial'&&!partial)||(mode==='breakEven'&&!armed))){
+   // A gap fill exits at the open; later OHLC extremes are post-exit and must not affect DD.
+   if(fill?.gap){
+    exit(trade.exit,remaining,true);
+    return finish(trade.reason);
+   }
    if(hitStop&&hitTarget){
     if(!openBeyondTarget){
      markAt(b.o);
