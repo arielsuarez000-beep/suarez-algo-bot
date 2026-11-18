@@ -12,7 +12,8 @@ const ctx={console,Error,Math,Number,Array,Map,Object,$:()=>({value:'5'})};vm.cr
 vm.runInContext(names.map(fn).join('\n'),ctx);
 const pairs=['BTCUSDT','ETHUSDT','SOLUSDT','1000PEPEUSDT','TAOUSDT','NEARUSDT','AVAXUSDT','DOGEUSDT','LINKUSDT','ARBUSDT'];
 const settings={capital:100,margin:10,leverage:10,riskPct:1,fee:0.055,slippage:0.03};
-const hosts=['https://api.bybit.com','https://api.bytick.com'],step=300000,days=180;
+const hosts=['https://api.bybit.com','https://api.bytick.com'],step=300000,days=Number(process.env.RANGE_AUDIT_DAYS||180);
+if(!Number.isInteger(days)||days<30||days>720)throw Error('RANGE_AUDIT_DAYS must be an integer from 30 to 720');
 function validateHistoryCoverage(rows,start,now,step){
  const firstExpected=Math.ceil(start/step)*step;
  const lastExpected=Math.floor((now-step)/step)*step;
@@ -33,8 +34,8 @@ async function page(pair,end){const errors=[];for(const host of hosts){const ac=
  const rows=j.result.list.map(x=>({t:+x[0],o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]})).filter(x=>[x.t,x.o,x.h,x.l,x.c,x.v].every(Number.isFinite));
  if(rows.length)return rows;throw Error('No candles');
  }catch(e){errors.push(host+': '+String(e.message||e));}finally{clearTimeout(timer);}}throw Error(errors.join(' | ')||'API failed');}
-async function history(pair,now){const start=now-days*86400000,buf=new Map();let cursor=now,n=0;
- while(cursor>=start&&n++<70){const a=await page(pair,cursor);let oldest=Infinity;for(const x of a){oldest=Math.min(oldest,x.t);if(x.t>=start&&x.t+step<=now)buf.set(x.t,x);}
+async function history(pair,now){const start=now-days*86400000,firstExpected=Math.ceil(start/step)*step,lastExpected=Math.floor((now-step)/step)*step,expected=Math.max(0,Math.floor((lastExpected-firstExpected)/step)+1),maxPages=Math.ceil(expected/1000)+3,buf=new Map();let cursor=now,n=0;
+ while(cursor>=start&&n++<maxPages){const a=await page(pair,cursor);let oldest=Infinity;for(const x of a){oldest=Math.min(oldest,x.t);if(x.t>=start&&x.t+step<=now)buf.set(x.t,x);}
  if(!Number.isFinite(oldest)||oldest>=cursor)throw Error('Pagination stalled');cursor=oldest-1;if(oldest<=start)break;if(a.length<200)throw Error('Short page');await new Promise(r=>setTimeout(r,150));}
  const rows=[...buf.values()].sort((a,b)=>a.t-b.t);validateHistoryCoverage(rows,start,now,step);return rows;}
 function summarize(trades,rows,from,activeSettings=settings,precomputed=null){const chosen=trades.filter(t=>t.entryTime>=from),s=precomputed||ctx.rangeMatchedExitStats(chosen,rows,activeSettings),o={};
